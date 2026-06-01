@@ -1,0 +1,21 @@
+{
+  "name": "claw-relay-server",
+  "version": "0.2.0",
+  "description": "Relay server for QR-controlled claw machine kiosk (v2)",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "mock": "node mock-kiosk.js",
+    "test": "node test-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "dotenv": "^16.4.5",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
