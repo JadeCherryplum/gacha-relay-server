@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>클로 머신 관리자</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;background:#f4f1ec;color:#29241f;margin:0;padding:28px}
+main{max-width:920px;margin:auto}.card{background:#fff;border-radius:18px;padding:24px;margin:18px 0;box-shadow:0 3px 14px #0001}
+h1,h2{font-weight:600}img{width:260px;max-width:100%}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px;border-bottom:1px solid #eee;font-size:14px}.muted{color:#796f65}
+</style>
+</head>
+<body><main>
+<h1>클로 머신 관리자</h1>
+<div class="card"><h2>오늘의 운영자 인증 QR</h2><div id="auth"></div></div>
+<div class="card"><h2>금 슬롯</h2><div id="slots"></div></div>
+<div class="card"><h2>최근 당첨 및 수령</h2><div id="claims"></div></div>
+</main>
+<script>
+const data=__ADMIN_DATA__;
+const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+document.querySelector('#auth').innerHTML=data.authUrl?`<img src="/qr?text=${encodeURIComponent(data.authUrl)}"><p class="muted">운영 시작 1시간 전부터 운영 종료까지 유효합니다.</p>`:'<p>현재 인증 QR 발급 시간이 아닙니다.</p>';
+document.querySelector('#slots').innerHTML=`<table><tr><th>시작</th><th>종료</th><th>확률</th><th>상태</th></tr>${data.slots.map(x=>`<tr><td>${esc(x.start_at)}</td><td>${esc(x.end_at)}</td><td>${x.p_start} → ${x.p_end}</td><td>${x.consumed_at?'소비됨':'대기'}</td></tr>`).join('')}</table>`;
+document.querySelector('#claims').innerHTML=`<table><tr><th>상품</th><th>키오스크</th><th>당첨 시각</th><th>수령</th></tr>${data.claims.map(x=>`<tr><td>${esc(x.result)}</td><td>${esc(x.kiosk_id)}</td><td>${esc(x.visible_at)}</td><td>${x.claimed_at?'완료 '+esc(x.claimed_at):'미수령'}</td></tr>`).join('')}</table>`;
+</script>
+</body></html>

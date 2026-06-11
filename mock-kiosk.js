@@ -12,7 +12,7 @@
 //   node mock-kiosk.js
 //   node mock-kiosk.js --id claw-02
 //   node mock-kiosk.js --server ws://192.168.0.100:8080
-//   node mock-kiosk.js --auto-grab 5    # 5초 후 자동 grab으로 게임 종료 시뮬레이션
+//   node mock-kiosk.js --auto-grab 5    # 모바일 없이 5초 후 grab 입력을 흉내냄
 
 import WebSocket from 'ws';
 import qrcode from 'qrcode-terminal';
@@ -84,14 +84,13 @@ function handleMessage(msg) {
       sessionActive = true;
       event(`${C.bold}모바일 접속${C.reset} sessionId=${msg.sessionId.substring(0, 8)}...`);
 
-      // auto-grab 옵션: 일정 시간 후 자동으로 게임 종료 시뮬레이션
+      // auto-grab 옵션: 일정 시간 후 키오스크 쪽 잡기 완료를 시뮬레이션
       if (AUTO_GRAB_AFTER > 0) {
-        info(`${AUTO_GRAB_AFTER}초 후 자동 game_ended 시뮬레이션 예정`);
+        info(`${AUTO_GRAB_AFTER}초 후 자동 grab_resolved 시뮬레이션 예정`);
         autoGrabTimer = setTimeout(() => {
           if (sessionActive) {
-            const result = Math.random() < 0.3 ? 'success' : 'fail';
-            warn(`[시뮬레이션] game_ended 신호 송출 (result=${result})`);
-            send({ type: 'session_event', event: 'game_ended', result });
+            warn('[시뮬레이션] grab_resolved 신호 송출');
+            send({ type: 'session_event', event: 'grab_resolved' });
           }
         }, AUTO_GRAB_AFTER * 1000);
       }
@@ -105,6 +104,15 @@ function handleMessage(msg) {
       }[msg.action] ?? msg.action;
       const phaseTag = msg.phase ? ` ${msg.phase}` : '';
       input(`${arrow} ${msg.action}${phaseTag}`);
+      if (msg.action === 'grab') {
+        setTimeout(() => send({ type: 'session_event', event: 'grab_resolved' }), 1000);
+      }
+      break;
+    }
+
+    case 'grab_result': {
+      event(`서버 판정 결과: ${C.bold}${msg.result}${C.reset}`);
+      setTimeout(() => send({ type: 'session_event', event: 'animation_done' }), 1500);
       break;
     }
 
@@ -187,7 +195,7 @@ process.on('SIGINT', () => {
 console.log(C.bold + `\n=== Mock Kiosk: ${KIOSK_ID} ===` + C.reset);
 console.log(`서버: ${SERVER}`);
 if (AUTO_GRAB_AFTER > 0) {
-  console.log(`자동 game_ended: ${AUTO_GRAB_AFTER}초 후`);
+  console.log(`자동 grab_resolved: ${AUTO_GRAB_AFTER}초 후`);
 }
 console.log('Ctrl+C로 종료\n');
 
