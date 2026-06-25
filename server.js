@@ -156,7 +156,7 @@ function invalidateResult(sessionId) {
 
 function startSession(kioskId, playToken, playerSocket) {
   const kiosk = kiosks.get(kioskId);
-  const sessionId = randomToken(18);
+  const sessionId = kiosk.activeSession?.sessionId ?? randomToken(18);
   const now = isoNow();
   db.prepare(`
     INSERT INTO play_log(session_id, kiosk_id, started_at)
@@ -174,6 +174,7 @@ function startSession(kioskId, playToken, playerSocket) {
     result: null,
     artifactIndex: null,
     sessionTimer: null,
+    startTimer: null,
     tickInterval: null,
     phaseTimer: null,
     rateWindow: Date.now(),
@@ -187,7 +188,7 @@ function startSession(kioskId, playToken, playerSocket) {
     sessionId,
     resultUrl: resultRecord.resultUrl,
   });
-  send(kiosk.socket, { type: 'player_joined', sessionId });
+  send(kiosk.socket, { type: 'player_joined', sessionId, durationMs: config.sessionDurationSeconds * 1000 });
 
   session.tickInterval = setInterval(() => {
     const remaining = Math.max(0, Math.ceil(config.sessionDurationSeconds - (Date.now() - session.startedAt) / 1000));
@@ -197,8 +198,36 @@ function startSession(kioskId, playToken, playerSocket) {
   log('session', `started kioskId=${kioskId} sessionId=${sessionId}`);
 }
 
+function claimSession(kioskId, playToken, playerSocket) {
+  const kiosk = kiosks.get(kioskId);
+  const sessionId = randomToken(18);
+  const session = {
+    sessionId,
+    playToken,
+    resultToken: null,
+    resultUrl: null,
+    playerSocket,
+    startedAt: null,
+    state: 'claimed',
+    result: null,
+    artifactIndex: null,
+    sessionTimer: null,
+    startTimer: null,
+    tickInterval: null,
+    phaseTimer: null,
+    rateWindow: Date.now(),
+    rateCount: 0,
+  };
+  kiosk.activeSession = session;
+  send(kiosk.socket, { type: 'player_claimed', sessionId });
+  send(playerSocket, { type: 'claimed', startTimeoutSeconds: Math.ceil(config.startTimeoutMs / 1000) });
+  session.startTimer = setTimeout(() => endSession(kioskId, 'start_timeout'), config.startTimeoutMs);
+  log('session', `claimed kioskId=${kioskId} sessionId=${sessionId}`);
+}
+
 function clearSessionTimers(session) {
   clearTimeout(session.sessionTimer);
+  clearTimeout(session.startTimer);
   clearTimeout(session.phaseTimer);
   clearInterval(session.tickInterval);
 }
@@ -286,8 +315,13 @@ function handleAnimationDone(kioskId) {
   const session = kiosks.get(kioskId)?.activeSession;
   if (!session || session.state !== 'waiting_animation_done') return;
   clearTimeout(session.phaseTimer);
-  revealResult(kioskId);
   endSession(kioskId, 'completed');
+}
+
+function handleResultVisible(kioskId) {
+  const session = kiosks.get(kioskId)?.activeSession;
+  if (!session || session.state !== 'waiting_animation_done') return;
+  revealResult(kioskId);
 }
 
 function checkRate(session) {
@@ -354,6 +388,7 @@ function handleKioskMessage(kioskId, msg) {
   }
   if (msg.type !== 'session_event') return;
   if (msg.event === 'grab_resolved') handleGrabResolved(kioskId, msg);
+  if (msg.event === 'result_visible') handleResultVisible(kioskId);
   if (msg.event === 'animation_done') handleAnimationDone(kioskId);
 }
 
@@ -374,12 +409,19 @@ function handlePlayerConnection(ws, token) {
     ws.close(1008, 'already_in_use');
     return;
   }
-  startSession(kioskId, token, ws);
+  claimSession(kioskId, token, ws);
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
     const session = kiosks.get(kioskId)?.activeSession;
-    if (!session || session.playerSocket !== ws || !checkRate(session) || msg.type !== 'input') return;
+    if (!session || session.playerSocket !== ws || !checkRate(session)) return;
+    if (session.state === 'claimed') {
+      if (msg.type !== 'start') return;
+      clearTimeout(session.startTimer);
+      startSession(kioskId, token, ws);
+      return;
+    }
+    if (msg.type !== 'input') return;
     if (!VALID_ACTIONS.has(msg.action)) return;
     if (msg.action === 'grab') {
       handleGrab(kioskId);
@@ -391,7 +433,7 @@ function handlePlayerConnection(ws, token) {
   ws.on('close', () => {
     const session = kiosks.get(kioskId)?.activeSession;
     if (!session || session.playerSocket !== ws) return;
-    if (session.state === 'playing') endSession(kioskId, 'disconnect', 'player_disconnect');
+    if (session.state === 'claimed' || session.state === 'playing') endSession(kioskId, 'disconnect', 'player_disconnect');
     else session.playerSocket = null;
   });
   ws.on('error', (error) => log('player', error.message));

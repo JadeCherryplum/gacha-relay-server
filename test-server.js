@@ -27,6 +27,7 @@ const server = spawn(process.execPath, ['server.js'], {
     CLOSE_TIME: '23:59',
     GRAB_RESOLVED_TIMEOUT_MS: '500',
     ANIMATION_DONE_TIMEOUT_MS: '500',
+    START_TIMEOUT_MS: '150',
     HEARTBEAT_INTERVAL_MS: '60000',
   },
   stdio: ['ignore', 'pipe', 'pipe'],
@@ -108,6 +109,9 @@ async function createPlayable(kioskId) {
   send(kiosk, { type: 'request_token' });
   const issued = await waitFor(() => kiosk.messages.find((m) => m.type === 'token_issued'), `${kioskId} 토큰 없음`);
   const player = await connect(`${WS}/play?token=${issued.token}`);
+  await waitFor(() => player.messages.find((m) => m.type === 'claimed'), `${kioskId} 토큰 선점 없음`);
+  await waitFor(() => kiosk.messages.find((m) => m.type === 'player_claimed'), `${kioskId} player_claimed 없음`);
+  send(player, { type: 'start' });
   const started = await waitFor(() => player.messages.find((m) => m.type === 'session_started'), `${kioskId} 세션 시작 없음`);
   return { kiosk, player, started };
 }
@@ -117,7 +121,10 @@ async function completeGrab(pair, sendAnimation = true) {
   await waitFor(() => pair.kiosk.messages.find((m) => m.type === 'player_input' && m.action === 'grab'), 'grab 릴레이 없음');
   send(pair.kiosk, { type: 'session_event', event: 'grab_resolved' });
   const result = await waitFor(() => pair.kiosk.messages.find((m) => m.type === 'grab_result'), 'grab_result 없음');
-  if (sendAnimation) send(pair.kiosk, { type: 'session_event', event: 'animation_done' });
+  if (sendAnimation) {
+    send(pair.kiosk, { type: 'session_event', event: 'result_visible' });
+    send(pair.kiosk, { type: 'session_event', event: 'animation_done' });
+  }
   return result;
 }
 
@@ -139,8 +146,9 @@ async function run() {
   send(first.kiosk, { type: 'session_event', event: 'grab_resolved' });
   const firstResult = await waitFor(() => first.kiosk.messages.find((m) => m.type === 'grab_result'), '첫 판정 없음');
   assert(firstResult.result === 'gold', `예상 gold, 실제 ${firstResult.result}`);
-  send(first.kiosk, { type: 'session_event', event: 'animation_done' });
+  send(first.kiosk, { type: 'session_event', event: 'result_visible' });
   const mobileResult = await waitFor(() => first.player.messages.find((m) => m.type === 'result'), '모바일 결과 없음');
+  send(first.kiosk, { type: 'session_event', event: 'animation_done' });
   assert(mobileResult.result === 'gold' && mobileResult.claimUrl, '금 결과/수령 URL 없음');
 
   const resultToken = new URL(first.started.resultUrl).searchParams.get('result');
@@ -170,9 +178,24 @@ async function run() {
     waitFor(() => right.kiosk.messages.find((m) => m.type === 'grab_result'), '오른쪽 결과 없음'),
   ]);
   assert([leftResult.result, rightResult.result].filter((x) => x === 'gold').length === 1, '동시 gold 중복 당첨');
+  send(left.kiosk, { type: 'session_event', event: 'result_visible' });
+  send(right.kiosk, { type: 'session_event', event: 'result_visible' });
   send(left.kiosk, { type: 'session_event', event: 'animation_done' });
   send(right.kiosk, { type: 'session_event', event: 'animation_done' });
   console.log('  ✓ 동시 요청 중 정확히 1건만 gold');
+
+  console.log('\n=== 시작 버튼 미입력 타임아웃 ===');
+  const idleKiosk = await connect(`${WS}/kiosk`);
+  send(idleKiosk, { type: 'kiosk_hello', kioskId: 'claw-idle' });
+  await wait(30);
+  send(idleKiosk, { type: 'request_token' });
+  const idleIssued = await waitFor(() => idleKiosk.messages.find((m) => m.type === 'token_issued'), 'idle 토큰 없음');
+  const idlePlayer = await connect(`${WS}/play?token=${idleIssued.token}`);
+  await waitFor(() => idlePlayer.messages.find((m) => m.type === 'claimed'), 'idle claimed 없음');
+  const idleEnded = await waitFor(() => idlePlayer.messages.find((m) => m.type === 'session_ended'), '시작 미입력 종료 없음');
+  assert(idleEnded.reason === 'start_timeout', `예상 start_timeout, 실제 ${idleEnded.reason}`);
+  await waitFor(() => idleKiosk.messages.find((m) => m.type === 'player_left' && m.reason === 'start_timeout'), '시작 미입력 player_left 없음');
+  console.log('  ✓ 시작 미입력 시 세션 종료');
 
   console.log('\n=== grab_resolved 타임아웃 ===');
   const timeoutPair = await createPlayable('claw-04');
@@ -194,6 +217,7 @@ async function run() {
   assert(animationMobileResult.result === animationResult.result, 'animation_done 타임아웃 결과 불일치');
   console.log('  ✓ 확정 결과 유지 후 모바일 전달');
 
+  try { idlePlayer.close(); idleKiosk.close(); } catch {}
   for (const pair of [first, left, right, timeoutPair, animationPair]) {
     try { pair.player.close(); pair.kiosk.close(); } catch {}
   }

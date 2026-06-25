@@ -7,35 +7,36 @@
   <style>
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
     html,body{margin:0;min-height:100%;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#2a130d;color:#f7ead0}
-    body{min-height:100dvh;overflow:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:#2a130d url('/gui/Bg.png') center top/cover no-repeat}
+    body{min-height:100dvh;overflow:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:#2a130d url('/gui/Bg.png') center/cover no-repeat}
     button{font:inherit;border:0;background:transparent;padding:0;margin:0;color:inherit;touch-action:none}
     .hidden{display:none!important}
-    .screen{position:relative;width:100%;height:100dvh;min-height:640px;overflow:hidden;display:flex;flex-direction:column;align-items:center}
-    .phone-top{width:100%;height:34px;flex:0 0 auto}
-    .content{position:relative;width:min(100vw,480px);height:calc(100dvh - 34px);min-height:606px;margin:0 auto}
-    .start-title{position:absolute;top:5.5%;left:50%;width:82%;transform:translateX(-50%)}
-    .title-machine{position:absolute;top:18%;left:50%;width:78%;max-height:58%;object-fit:contain;transform:translateX(-50%);filter:drop-shadow(0 16px 28px rgba(0,0,0,.35))}
-    .start-button{position:absolute;left:50%;bottom:7.2%;width:78%;max-width:390px;transform:translateX(-50%)}
+    .screen{position:relative;width:100%;height:100dvh;overflow:hidden;display:flex;align-items:center;justify-content:center}
+    .phone-top{display:none}
+    .content{position:relative;width:min(100vw,calc(100dvh * 970 / 2158));height:min(100dvh,calc(100vw * 2158 / 970));margin:0 auto;overflow:hidden}
+    .start-title{position:absolute;top:3.1%;left:50%;width:88%;transform:translateX(-50%)}
+    .title-machine{position:absolute;top:20.8%;left:50%;width:84%;max-height:57%;object-fit:contain;transform:translateX(-50%);filter:drop-shadow(0 16px 28px rgba(0,0,0,.35))}
+    .start-button{position:absolute;left:50%;bottom:5.9%;width:76%;max-width:390px;transform:translateX(-50%)}
     .start-button img,.control-button img,.grab-button img{display:block;width:100%;height:auto;pointer-events:none}
     .start-button:active,.control-button:active,.grab-button:active,.pressed{transform:scale(.95)}
-    .play-timer{position:absolute;top:7.4%;left:50%;width:48%;max-width:260px;transform:translateX(-50%)}
+    .play-timer{position:absolute;top:7.4%;left:50%;width:50.2%;max-width:260px;transform:translateX(-50%)}
     .timer-bg{display:block;width:100%;height:auto}
     .timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:.2em;font-weight:900;font-size:clamp(28px,8vw,46px);letter-spacing:.04em;color:#fff0c2;text-shadow:0 2px 5px rgba(0,0,0,.45)}
-    .pad{position:absolute;top:34%;left:50%;width:74%;max-width:350px;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:url('/gui/bg_center.png') center/contain no-repeat;filter:drop-shadow(0 18px 28px rgba(0,0,0,.32))}
-    .control-button{position:absolute;width:38%;height:38%;display:flex;align-items:center;justify-content:center;transition:filter .08s ease,opacity .12s ease}
+    .pad{position:absolute;top:33.2%;left:50%;width:77%;max-width:370px;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:url('/gui/bg_center.png') center/76% 76% no-repeat;filter:drop-shadow(0 18px 28px rgba(0,0,0,.32))}
+    .control-button{position:absolute;width:32%;height:32%;display:flex;align-items:center;justify-content:center;transition:filter .08s ease,opacity .12s ease}
     .control-button:disabled,.grab-button:disabled{opacity:.45;filter:grayscale(.15)}
-    .control-button.up{top:1%;left:31%}
-    .control-button.left{top:31%;left:1%}
-    .control-button.right{top:31%;right:1%}
-    .control-button.down{bottom:1%;left:31%}
-    .grab-button{position:absolute;left:50%;bottom:5.5%;width:44%;max-width:210px;transform:translateX(-50%);transition:filter .08s ease,opacity .12s ease}
+    .control-button.up{top:0;left:34%}
+    .control-button.left{top:34%;left:0}
+    .control-button.right{top:34%;right:0}
+    .control-button.down{bottom:0;left:34%}
+    .grab-button{position:absolute;left:50%;bottom:5.8%;width:42%;max-width:210px;transform:translateX(-50%);transition:filter .08s ease,opacity .12s ease}
     .grab-button:active{transform:translateX(-50%) scale(.95)}
     .status-text{position:absolute;left:8%;right:8%;bottom:2.3%;text-align:center;font-size:13px;color:#e8caa0;text-shadow:0 1px 3px #000}
-    .result-wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:7.5% 6% 5%}
-    .relic-frame{position:relative;width:min(78%,330px);height:42%;min-height:265px;margin-top:1%;display:flex;align-items:center;justify-content:center;background:center/contain no-repeat;filter:drop-shadow(0 14px 22px rgba(0,0,0,.35))}
+    .start-status{display:none}
+    .result-wrap{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:7.6% 6% 5%}
+    .relic-frame{position:relative;width:72%;height:auto;aspect-ratio:1162/1810;margin-top:0;display:flex;align-items:center;justify-content:center;background:center/100% 100% no-repeat;filter:drop-shadow(0 14px 22px rgba(0,0,0,.35))}
     .relic-frame.normal{background-image:url('/gui/img_info.png')}
-    .relic-frame.prize{width:min(86%,370px);height:44%;background-image:url('/gui/img_info_gold.png')}
-    .relic-img{max-width:64%;max-height:74%;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(0,0,0,.28))}
+    .relic-frame.prize{width:78%;aspect-ratio:1809/2202;background-image:url('/gui/img_info_gold.png')}
+    .relic-img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(0,0,0,.28))}
     .name-box{position:relative;width:94%;height:52px;margin:2.8% auto 1.7%;background:url('/gui/Box_name_empty.png') center/100% 100% no-repeat;display:flex;align-items:center;justify-content:center;padding:0 22px;color:#fff2cc;font-weight:900;font-size:clamp(16px,4.4vw,22px);line-height:1.15;text-shadow:0 2px 4px rgba(0,0,0,.45)}
     .result-line{width:78%;height:auto;margin:1.5% auto 2%}
     .description{width:88%;max-height:21%;overflow:auto;margin:0 auto;color:#f2dfbd;font-size:clamp(13px,3.5vw,16px);line-height:1.58;word-break:keep-all;text-shadow:0 1px 3px rgba(0,0,0,.4)}
@@ -46,7 +47,7 @@
     .notice-panel p{margin:0;color:#ead1a7;line-height:1.6}
     .spinner{width:54px;height:54px;border:5px solid rgba(255,234,190,.25);border-top-color:#f7d378;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 22px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media (max-height:720px){.screen{min-height:560px}.content{min-height:526px}.start-title{top:3.5%;width:70%}.title-machine{top:15%;width:64%;max-height:50%}.start-button{bottom:5%;width:68%}.pad{top:30%;width:60%}.grab-button{width:34%;bottom:3.8%}.relic-frame{height:38%;min-height:220px}.description{max-height:18%}.claim img{width:68px;height:68px}}
+    @media (max-height:720px){.claim img{width:68px;height:68px}}
   </style>
 </head>
 <body>
@@ -56,7 +57,7 @@
       <img class="start-title" src="/gui/Title.png" alt="백제 왕실 황금보물을 찾아라!">
       <img class="title-machine" src="/gui/Title_img.png" alt="클로 머신">
       <button id="startButton" class="start-button" aria-label="뽑기 시작하기"><img src="/gui/Btn_start.png" alt="뽑기 시작하기"></button>
-      <div id="startStatus" class="status-text">버튼을 누르면 조작이 시작됩니다.</div>
+      <div id="startStatus" class="status-text start-status"></div>
     </div>
   </section>
 
@@ -110,24 +111,27 @@
     const grab=document.querySelector('#grab');
     const startButton=document.querySelector('#startButton');
     const held=new Map();
-    let ws=null,resultUrl=null,finished=false,artifactData=null,bound=false,started=false;
+    let ws=null,resultUrl=null,finished=false,artifactData=null,bound=false,started=false,startDeadlineTimer=null;
 
     function stop(action){const x=held.get(action);if(!x)return;clearInterval(x.timer);x.button.classList.remove('pressed');held.delete(action);send(action,'stop')}
     function stopAll(){[...held.keys()].forEach(stop)}
     function send(action,phase){if(ws?.readyState===1)ws.send(JSON.stringify(phase?{type:'input',action,phase}:{type:'input',action}))}
     function setControlsDisabled(disabled){buttons.forEach(b=>b.disabled=disabled);grab.disabled=disabled}
     function disable(){stopAll();setControlsDisabled(true)}
+    function clearStartDeadline(){if(startDeadlineTimer){clearTimeout(startDeadlineTimer);startDeadlineTimer=null}}
     function bind(){if(bound)return;bound=true;buttons.forEach(b=>{const a=b.dataset.action,start=e=>{e.preventDefault();if(held.has(a)||b.disabled)return;b.classList.add('pressed');send(a,'start');held.set(a,{button:b,timer:setInterval(()=>send(a,'hold'),HOLD_MS)})};['pointerdown','touchstart'].forEach(ev=>b.addEventListener(ev,start,{passive:false}));['pointerup','pointercancel','pointerleave','touchend','touchcancel'].forEach(ev=>b.addEventListener(ev,()=>stop(a),{passive:false}))});grab.addEventListener('click',()=>{if(grab.disabled)return;disable();send('grab')})}
     async function artifactByIndex(index){if(index===null||index===undefined)return null;if(!artifactData){try{const r=await fetch('/artifacts.json',{cache:'no-store'});artifactData=r.ok?await r.json():{artifacts:[]}}catch{artifactData={artifacts:[]}}}return (artifactData.artifacts||[]).find(x=>Number(x.index)===Number(index))||null}
     function relicImageUrl(index){const n=Number(index);if(!Number.isFinite(n))return '/gui/relic/01.png';return `/gui/relic/${String(n+1).padStart(2,'0')}.png`}
     async function showResult(data){finished=true;disable();show('finished');const artifact=await artifactByIndex(data.artifactIndex);const hasClaim=Boolean(data.claimUrl)&&(data.result==='gold'||data.result==='silver');const frame=document.querySelector('#relicFrame');const img=document.querySelector('#relicImage');const title=document.querySelector('#resultTitle');const message=document.querySelector('#resultMessage');const claim=document.querySelector('#claim');frame.className=`relic-frame ${hasClaim?'prize':'normal'}`;img.src=relicImageUrl(data.artifactIndex);img.alt=artifact?.name||'유물 이미지';title.textContent=artifact?.name || (hasClaim?'당첨 결과':'결과');message.textContent=artifact?.description || '참여해주셔서 감사합니다.';claim.classList.toggle('hidden',!hasClaim);if(hasClaim)document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`}
     async function recover(urlToken){show('resolving');const poll=async()=>{try{const r=await fetch(`/api/results/${encodeURIComponent(urlToken)}`,{cache:'no-store'});const data=await r.json();if(r.status===200)return showResult(data);if(r.status===202)return setTimeout(poll,1000);notice('만료된 결과 링크','오늘 운영 시간이 종료되었거나 상품 수령이 완료되었습니다.')}catch{setTimeout(poll,1500)}};poll()}
-    function connect(){if(started)return;started=true;startButton.disabled=true;document.querySelector('#startStatus').textContent='서버에 연결 중입니다...';const scheme=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${scheme}//${location.host}/play?token=${encodeURIComponent(playToken)}`);ws.onopen=()=>document.querySelector('#startStatus').textContent='연결되었습니다.';ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='session_started'){resultUrl=m.resultUrl;history.replaceState(null,'',m.resultUrl);document.querySelector('#timer').textContent=fmt(m.duration);document.querySelector('#playStatus').textContent='조작 가능';show('playing');setControlsDisabled(false);bind()}else if(m.type==='tick'){document.querySelector('#timer').textContent=fmt(m.remaining)}else if(m.type==='resolving'){disable();show('resolving')}else if(m.type==='result'){showResult(m)}else if(m.type==='error'){notice('처리 오류','키오스크에서 새 QR 코드를 스캔해 주세요.')}else if(m.type==='session_ended'&&!finished&&m.reason!=='completed'){notice('플레이 종료','키오스크에서 새 QR 코드를 스캔해 주세요.')}};ws.onclose=()=>{if(finished)return;const token=resultUrl?new URL(resultUrl).searchParams.get('result'):null;if(token)recover(token);else notice('연결이 끊어졌습니다','키오스크에서 새 QR 코드를 스캔해 주세요.')}}
+    function connect(){const scheme=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${scheme}//${location.host}/play?token=${encodeURIComponent(playToken)}`);ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='claimed'){show('start');startButton.disabled=false;clearStartDeadline();startDeadlineTimer=setTimeout(()=>notice('시작 시간이 만료되었습니다','키오스크에서 새 QR 코드를 다시 스캔해 주세요.'),(Number(m.startTimeoutSeconds)||30)*1000+800)}else if(m.type==='session_started'){clearStartDeadline();resultUrl=m.resultUrl;history.replaceState(null,'',m.resultUrl);document.querySelector('#timer').textContent=fmt(m.duration);document.querySelector('#playStatus').textContent='조작 가능';show('playing');setControlsDisabled(false);bind()}else if(m.type==='tick'){document.querySelector('#timer').textContent=fmt(m.remaining)}else if(m.type==='resolving'){disable();show('resolving')}else if(m.type==='result'){showResult(m)}else if(m.type==='error'){notice('처리 오류','키오스크에서 새 QR 코드를 스캔해 주세요.')}else if(m.type==='session_ended'&&!finished&&m.reason!=='completed'){notice('플레이 종료','키오스크에서 새 QR 코드를 스캔해 주세요.')}};ws.onclose=()=>{clearStartDeadline();if(finished)return;const token=resultUrl?new URL(resultUrl).searchParams.get('result'):null;if(token)recover(token);else notice('연결이 종료되었습니다','키오스크에서 새 QR 코드를 스캔해 주세요.')}}
     setControlsDisabled(true);
     if(resultToken&&!playToken){recover(resultToken);return}
     if(!playToken){notice('잘못된 접속','키오스크의 QR 코드를 다시 스캔해 주세요.');return}
-    show('start');
-    startButton.addEventListener('click',connect);
+    startButton.disabled=true;
+    show('notice');
+    connect();
+    startButton.addEventListener('click',()=>{if(started||ws?.readyState!==1)return;started=true;startButton.disabled=true;ws.send(JSON.stringify({type:'start'}))});
   })();
   </script>
 </body>
