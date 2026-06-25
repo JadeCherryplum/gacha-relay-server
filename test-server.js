@@ -197,6 +197,19 @@ async function run() {
   await waitFor(() => idleKiosk.messages.find((m) => m.type === 'player_left' && m.reason === 'start_timeout'), '시작 미입력 player_left 없음');
   console.log('  ✓ 시작 미입력 시 세션 종료');
 
+  console.log('\n=== 물리 잡기 실패 결과 표시 ===');
+  const failPair = await createPlayable('claw-fail');
+  send(failPair.player, { type: 'input', action: 'grab' });
+  await waitFor(() => failPair.kiosk.messages.find((m) => m.type === 'player_input' && m.action === 'grab'), '실패 grab 릴레이 없음');
+  send(failPair.kiosk, { type: 'session_event', event: 'grab_resolved', grabbed: false });
+  const failServerResult = await waitFor(() => failPair.kiosk.messages.find((m) => m.type === 'grab_result'), '실패 grab_result 없음');
+  assert(failServerResult.result === 'fail' && failServerResult.artifactIndex == null, '물리 실패 결과 값 오류');
+  send(failPair.kiosk, { type: 'session_event', event: 'result_visible' });
+  const failMobileResult = await waitFor(() => failPair.player.messages.find((m) => m.type === 'result'), '실패 모바일 결과 없음');
+  assert(failMobileResult.result === 'fail' && failMobileResult.artifactIndex == null, '물리 실패 모바일 결과 오류');
+  send(failPair.kiosk, { type: 'session_event', event: 'animation_done' });
+  console.log('  ✓ 실패도 모바일 결과 표시');
+
   console.log('\n=== grab_resolved 타임아웃 ===');
   const timeoutPair = await createPlayable('claw-04');
   send(timeoutPair.player, { type: 'input', action: 'grab' });
@@ -218,7 +231,7 @@ async function run() {
   console.log('  ✓ 확정 결과 유지 후 모바일 전달');
 
   try { idlePlayer.close(); idleKiosk.close(); } catch {}
-  for (const pair of [first, left, right, timeoutPair, animationPair]) {
+  for (const pair of [first, left, right, failPair, timeoutPair, animationPair]) {
     try { pair.player.close(); pair.kiosk.close(); } catch {}
   }
   console.log('\n모든 통합 테스트 통과');
