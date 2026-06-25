@@ -1,25 +1,9 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#f4f1ec">
-<title>클로 머신 컨트롤러</title>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>부여 가챠 컨트롤러</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;background:#f4f1ec;color:#29241f}body{min-height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}.screen{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px}.hidden{display:none!important}.top{position:absolute;top:calc(24px + env(safe-area-inset-top));left:24px;right:24px;display:flex;justify-content:space-between;align-items:center}.timer{font-size:44px;font-weight:600}.status{background:#fff9;padding:8px 14px;border-radius:999px;font-size:12px}.stage{display:flex;flex-direction:column;align-items:center;gap:42px}.dpad{display:grid;grid-template:repeat(3,76px)/repeat(3,76px);gap:3px}.dpad button,.center{border:0;background:#faf7f2;border-radius:14px}.dpad button{font-size:30px;color:#a39788;touch-action:none}.dpad button.pressed{background:#c9a472;color:#fff}.up{grid-column:2}.left{grid-column:1;grid-row:2}.center{grid-column:2;grid-row:2;background:#ebe6dd}.right{grid-column:3;grid-row:2}.down{grid-column:2;grid-row:3}.grab{border:0;background:#c87f5e;color:#fff;width:210px;height:88px;border-radius:44px;font-size:24px;font-weight:700;box-shadow:0 8px 20px #b4644633}.grab:disabled,.dpad button:disabled{opacity:.35}.panel{text-align:center;max-width:480px}.panel h1{font-size:28px;margin:0 0 14px}.panel p{line-height:1.65;color:#6e6256}.spinner{width:54px;height:54px;border:5px solid #ded7ce;border-top-color:#c87f5e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 28px}@keyframes spin{to{transform:rotate(360deg)}}.result{font-size:64px;font-weight:800;text-transform:uppercase;margin:12px}.gold{color:#b58a27}.silver{color:#7d8790}.fail{color:#8d8175}.claim{background:#fff;border-radius:18px;padding:18px;margin-top:24px}.claim img{width:240px;max-width:100%}.small{font-size:13px;color:#8b8075}
-</style>
-</head>
-<body>
-<section id="playing" class="screen hidden">
-  <div class="top"><div><span id="timer" class="timer">--</span>초</div><div id="status" class="status">연결 중</div></div>
-  <div class="stage">
-    <div class="dpad">
-      <button class="up" data-action="up">↑</button><button class="left" data-action="left">←</button><div class="center"></div><button class="right" data-action="right">→</button><button class="down" data-action="down">↓</button>
-    </div>
-    <button id="grab" class="grab">잡기</button>
-  </div>
-</section>
-<section id="resolving" class="screen hidden"><div class="panel"><div class="spinner"></div><h1>결과 확인 중</h1><p>키오스크의 연출이 끝날 때까지 잠시 기다려주세요.</p></div></section>
+</style></head><body>
+<section id="playing" class="screen hidden"><div class="top"><div id="timer" class="timer">60</div><div id="status" class="status">연결 중</div></div><div class="stage"><div class="dpad"><button class="up" data-action="up">▲</button><button class="left" data-action="left">◀</button><div class="center"></div><button class="right" data-action="right">▶</button><button class="down" data-action="down">▼</button></div><button id="grab" class="grab">잡기</button></div></section>
+<section id="resolving" class="screen hidden"><div class="panel"><div class="spinner"></div><h1>결과 확인 중</h1><p>클로가 움직이고 있습니다. 잠시만 기다려주세요.</p></div></section>
 <section id="finished" class="screen hidden"><div class="panel"><h1 id="resultTitle">결과</h1><div id="resultValue" class="result"></div><p id="resultMessage"></p><div id="claim" class="claim hidden"><p><strong>상품 수령 QR</strong></p><img id="claimQr" alt="상품 수령 QR"><p class="small">오늘 운영 종료 전까지 운영자에게 보여주세요.<br>수령 완료 후에는 다시 확인할 수 없습니다.</p></div></div></section>
 <section id="notice" class="screen"><div class="panel"><h1 id="noticeTitle">연결 중...</h1><p id="noticeMessage">잠시만 기다려주세요.</p></div></section>
 <script>
@@ -28,13 +12,14 @@ const HOLD_MS=100,params=new URLSearchParams(location.search),playToken=params.g
 const screens=['playing','resolving','finished','notice'];
 const show=id=>screens.forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));
 const notice=(title,message)=>{document.querySelector('#noticeTitle').textContent=title;document.querySelector('#noticeMessage').textContent=message;show('notice')};
-const buttons=[...document.querySelectorAll('.dpad button')],grab=document.querySelector('#grab'),held=new Map();let ws=null,resultUrl=null,finished=false;
+const buttons=[...document.querySelectorAll('.dpad button')],grab=document.querySelector('#grab'),held=new Map();let ws=null,resultUrl=null,finished=false,artifactData=null;
 function stop(action){const x=held.get(action);if(!x)return;clearInterval(x.timer);x.button.classList.remove('pressed');held.delete(action);send(action,'stop')}
 function stopAll(){[...held.keys()].forEach(stop)}
 function send(action,phase){if(ws?.readyState===1)ws.send(JSON.stringify(phase?{type:'input',action,phase}:{type:'input',action}))}
-function disable(){stopAll();buttons.forEach(x=>x.disabled=true);grab.disabled=true}
-function bind(){buttons.forEach(button=>{const action=button.dataset.action;const start=e=>{e.preventDefault();if(held.has(action))return;button.classList.add('pressed');send(action,'start');held.set(action,{button,timer:setInterval(()=>send(action,'hold'),HOLD_MS)})};button.addEventListener('pointerdown',start);button.addEventListener('pointerup',()=>stop(action));button.addEventListener('pointercancel',()=>stop(action));button.addEventListener('pointerleave',()=>stop(action))});grab.addEventListener('click',()=>{disable();send('grab');show('resolving')});document.addEventListener('visibilitychange',()=>document.hidden&&stopAll())}
-function showResult(data){finished=true;show('finished');const value=document.querySelector('#resultValue'),title=document.querySelector('#resultTitle'),message=document.querySelector('#resultMessage');value.textContent=data.result;value.className=`result ${data.result}`;if(data.result==='gold'){title.textContent='금 당첨!';message.textContent='축하합니다. 운영자에게 수령 QR을 보여주세요.'}else if(data.result==='silver'){title.textContent='은 당첨!';message.textContent='축하합니다. 운영자에게 수령 QR을 보여주세요.'}else{title.textContent='아쉽지만 꽝입니다';message.textContent='참여해주셔서 감사합니다.'}if(data.claimUrl){document.querySelector('#claim').classList.remove('hidden');document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`}}
+function bind(){buttons.forEach(b=>{const a=b.dataset.action,start=e=>{e.preventDefault();if(held.has(a)||b.disabled)return;b.classList.add('pressed');send(a,'start');held.set(a,{button:b,timer:setInterval(()=>send(a,'hold'),HOLD_MS)})};['pointerdown','touchstart'].forEach(ev=>b.addEventListener(ev,start,{passive:false}));['pointerup','pointercancel','pointerleave','touchend','touchcancel'].forEach(ev=>b.addEventListener(ev,()=>stop(a),{passive:false}))});grab.addEventListener('click',()=>{disable();send('grab')})}
+function disable(){stopAll();buttons.forEach(b=>b.disabled=true);grab.disabled=true}
+async function artifactByIndex(index){if(index===null||index===undefined)return null;if(!artifactData){try{const r=await fetch('/artifacts.json',{cache:'no-store'});artifactData=r.ok?await r.json():{artifacts:[]}}catch{artifactData={artifacts:[]}}}return (artifactData.artifacts||[]).find(x=>x.index===index)||null}
+async function showResult(data){finished=true;show('finished');const value=document.querySelector('#resultValue'),title=document.querySelector('#resultTitle'),message=document.querySelector('#resultMessage'),claim=document.querySelector('#claim');value.textContent=data.result;value.className=`result ${data.result}`;claim.classList.add('hidden');const artifact=await artifactByIndex(data.artifactIndex);if(artifact){title.textContent=artifact.name;message.textContent=artifact.description}else if(data.result==='gold'){title.textContent='금 당첨!';message.textContent='축하합니다. 운영자에게 수령 QR을 보여주세요.'}else if(data.result==='silver'){title.textContent='은 당첨!';message.textContent='축하합니다. 운영자에게 수령 QR을 보여주세요.'}else{title.textContent='아쉽지만 꽝입니다';message.textContent='참여해주셔서 감사합니다.'}if(data.claimUrl){claim.classList.remove('hidden');document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`}}
 async function recover(urlToken){show('resolving');const poll=async()=>{try{const r=await fetch(`/api/results/${encodeURIComponent(urlToken)}`,{cache:'no-store'});const data=await r.json();if(r.status===200)return showResult(data);if(r.status===202)return setTimeout(poll,1000);notice('만료된 결과 링크','오늘 운영 시간이 종료되었거나 상품 수령이 완료되었습니다.')}catch{setTimeout(poll,1500)}};poll()}
 if(resultToken&&!playToken){recover(resultToken);return}
 if(!playToken){notice('잘못된 접속','키오스크의 QR 코드를 다시 스캔해주세요.');return}
@@ -43,5 +28,4 @@ ws.onopen=()=>document.querySelector('#status').textContent='연결됨';
 ws.onmessage=e=>{let m;try{m=JSON.parse(e.data)}catch{return}if(m.type==='session_started'){resultUrl=m.resultUrl;history.replaceState(null,'',m.resultUrl);document.querySelector('#timer').textContent=m.duration;show('playing');bind()}else if(m.type==='tick')document.querySelector('#timer').textContent=m.remaining;else if(m.type==='resolving'){disable();show('resolving')}else if(m.type==='result')showResult(m);else if(m.type==='error')notice('처리 오류','키오스크에서 새 QR 코드를 스캔해주세요.');else if(m.type==='session_ended'&&!finished&&m.reason!=='completed')notice('플레이 종료','키오스크에서 새 QR 코드를 스캔해주세요.')};
 ws.onclose=()=>{if(finished)return;const token=resultUrl?new URL(resultUrl).searchParams.get('result'):null;if(token)recover(token);else notice('연결이 끊어졌습니다','키오스크에서 새 QR 코드를 스캔해주세요.')};
 })();
-</script>
-</body></html>
+</script></body></html>

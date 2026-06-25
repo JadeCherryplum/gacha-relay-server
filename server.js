@@ -22,6 +22,11 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLAY_HTML = readFileSync(join(__dirname, 'public', 'play.html'), 'utf8');
 const ADMIN_HTML = readFileSync(join(__dirname, 'public', 'admin.html'), 'utf8');
+const ARTIFACTS_JSON = readFileSync(join(__dirname, 'public', 'artifacts.json'), 'utf8');
+const ARTIFACT_DATA = JSON.parse(ARTIFACTS_JSON.replace(/^\uFEFF/, ''));
+const ARTIFACT_INDEXES = Array.isArray(ARTIFACT_DATA.artifacts)
+  ? ARTIFACT_DATA.artifacts.map((artifact) => Number(artifact.index)).filter(Number.isInteger)
+  : [];
 
 const kiosks = new Map();
 const tokenIndex = new Map();
@@ -34,6 +39,11 @@ function log(tag, ...args) {
 
 function send(ws, payload) {
   if (ws?.readyState === 1) ws.send(JSON.stringify(payload));
+}
+
+function randomArtifactIndex(random = Math.random) {
+  if (!ARTIFACT_INDEXES.length) return null;
+  return ARTIFACT_INDEXES[Math.floor(random() * ARTIFACT_INDEXES.length)];
 }
 
 function json(res, status, payload) {
@@ -126,6 +136,7 @@ function startSession(kioskId, playToken, playerSocket) {
     startedAt: Date.now(),
     state: 'playing',
     result: null,
+    artifactIndex: null,
     sessionTimer: null,
     tickInterval: null,
     phaseTimer: null,
@@ -147,7 +158,7 @@ function startSession(kioskId, playToken, playerSocket) {
     if (remaining > 0) send(session.playerSocket, { type: 'tick', remaining });
   }, 1000);
   session.sessionTimer = setTimeout(() => endSession(kioskId, 'timeout'), config.sessionDurationSeconds * 1000);
-  log('session', `시작 kioskId=${kioskId} sessionId=${sessionId}`);
+  log('session', `started kioskId=${kioskId} sessionId=${sessionId}`);
 }
 
 function clearSessionTimers(session) {
@@ -162,11 +173,12 @@ function revealResult(kioskId) {
   const visibleAt = isoNow();
   db.prepare('UPDATE result_tokens SET visible_at = COALESCE(visible_at, ?) WHERE session_id = ?')
     .run(visibleAt, session.sessionId);
-  const row = db.prepare('SELECT claim_token FROM result_tokens WHERE session_id = ?').get(session.sessionId);
+  const row = db.prepare('SELECT claim_token, artifact_index FROM result_tokens WHERE session_id = ?').get(session.sessionId);
   send(session.playerSocket, {
     type: 'result',
     result: session.result,
     resultUrl: session.resultUrl,
+    artifactIndex: row?.artifact_index ?? session.artifactIndex ?? null,
     claimUrl: row?.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
   });
 }
@@ -188,7 +200,7 @@ function endSession(kioskId, reason, errorCode = null) {
   if (session.playerSocket?.readyState === 1) session.playerSocket.close(1000, 'session_ended');
   if (reason !== 'kiosk_lost' && isKioskOnline(kioskId)) send(kiosk.socket, { type: 'player_left', reason });
   kiosk.activeSession = null;
-  log('session', `종료 kioskId=${kioskId} reason=${reason}${errorCode ? ` error=${errorCode}` : ''}`);
+  log('session', `ended kioskId=${kioskId} reason=${reason}${errorCode ? ` error=${errorCode}` : ''}`);
 }
 
 function handleGrab(kioskId) {
@@ -209,22 +221,24 @@ function handleGrab(kioskId) {
   }, config.grabResolvedTimeoutMs);
 }
 
-function handleGrabResolved(kioskId) {
+function handleGrabResolved(kioskId, msg = {}) {
   const kiosk = kiosks.get(kioskId);
   const session = kiosk?.activeSession;
   if (!session || session.state !== 'waiting_grab_resolved') return;
   clearTimeout(session.phaseTimer);
 
-  session.result = resolveGrab(kioskId, session.sessionId);
+  const physicallyGrabbed = msg.grabbed !== false;
+  session.result = physicallyGrabbed ? resolveGrab(kioskId, session.sessionId) : 'fail';
+  session.artifactIndex = physicallyGrabbed ? randomArtifactIndex() : null;
   session.state = 'waiting_animation_done';
   const claimToken = session.result === 'gold' || session.result === 'silver' ? randomToken() : null;
   db.prepare(`
     UPDATE play_log SET resolved_at = ?, result = ? WHERE session_id = ?
   `).run(isoNow(), session.result, session.sessionId);
   db.prepare(`
-    UPDATE result_tokens SET result = ?, claim_token = ? WHERE session_id = ?
-  `).run(session.result, claimToken, session.sessionId);
-  send(kiosk.socket, { type: 'grab_result', result: session.result });
+    UPDATE result_tokens SET result = ?, claim_token = ?, artifact_index = ? WHERE session_id = ?
+  `).run(session.result, claimToken, session.artifactIndex, session.sessionId);
+  send(kiosk.socket, { type: 'grab_result', result: session.result, artifactIndex: session.artifactIndex });
 
   session.phaseTimer = setTimeout(() => {
     revealResult(kioskId);
@@ -267,7 +281,7 @@ function handleKioskConnection(ws) {
       if (existing?.activeSession) endSession(kioskId, 'kiosk_lost', 'kiosk_replaced');
       try { existing?.socket?.close(1000, 'replaced'); } catch {}
       kiosks.set(kioskId, { socket: ws, pendingToken: existing?.pendingToken ?? null, activeSession: null });
-      log('kiosk', `${kioskId} 연결됨`);
+      log('kiosk', kioskId + ' connected');
       return;
     }
     handleKioskMessage(kioskId, msg);
@@ -285,7 +299,7 @@ function handleKioskConnection(ws) {
     }
     if (kiosk.pendingToken) tokenIndex.delete(kiosk.pendingToken.token);
     kiosks.delete(kioskId);
-    log('kiosk', `${kioskId} 연결 종료`);
+    log('kiosk', kioskId + ' disconnected');
   });
   ws.on('error', (error) => log('kiosk', error.message));
 }
@@ -303,7 +317,7 @@ function handleKioskMessage(kioskId, msg) {
     return;
   }
   if (msg.type !== 'session_event') return;
-  if (msg.event === 'grab_resolved') handleGrabResolved(kioskId);
+  if (msg.event === 'grab_resolved') handleGrabResolved(kioskId, msg);
   if (msg.event === 'animation_done') handleAnimationDone(kioskId);
 }
 
@@ -354,6 +368,7 @@ function resultPayload(row) {
   return {
     status: 'finished',
     result: row.result,
+    artifactIndex: row.artifact_index ?? null,
     claimUrl: row.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
     expiresAt: row.expires_at,
   };
@@ -379,10 +394,10 @@ function claimRow(token) {
   `).get(token) ?? null;
 }
 
-function loginForm(action, title = '관리자 인증') {
+function loginForm(action, title = 'Admin Login') {
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${title}</title><style>body{font-family:sans-serif;max-width:420px;margin:60px auto;padding:20px}input,button{font-size:18px;padding:14px;width:100%;box-sizing:border-box;margin:8px 0}</style>
-  <h1>${title}</h1><form method="post" action="${action}"><input type="password" name="password" placeholder="관리자 비밀번호" required><button>인증</button></form></html>`;
+  <h1>${title}</h1><form method="post" action="${action}"><input type="password" name="password" placeholder="Admin password" required><button>Login</button></form></html>`;
 }
 
 function claimPage(row) {
@@ -393,12 +408,15 @@ function claimPage(row) {
   <title>상품 수령 확인</title><style>body{font-family:sans-serif;max-width:520px;margin:40px auto;padding:20px}dt{color:#666;margin-top:18px}dd{font-size:22px;margin:4px 0}button{font-size:20px;padding:16px;width:100%;margin-top:28px}</style>
   <h1>상품 수령 확인</h1><dl><dt>상품 종류</dt><dd>${row.result.toUpperCase()}</dd><dt>당첨 시각</dt><dd>${row.resolved_at}</dd><dt>키오스크 ID</dt><dd>${row.kiosk_id}</dd><dt>수령 상태</dt><dd>${status}</dd></dl>${button}</html>`;
 }
-
 async function handleHttp(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   cleanupExpired();
 
   if (url.pathname === '/healthz') return json(res, 200, { ok: true });
+  if (url.pathname === '/artifacts.json') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(ARTIFACTS_JSON);
+  }
   if (url.pathname === '/play') return html(res, 200, PLAY_HTML);
 
   if (url.pathname.startsWith('/api/results/') && req.method === 'GET') {
@@ -417,14 +435,14 @@ async function handleHttp(req, res) {
 
   if (url.pathname === '/admin/login' && req.method === 'GET') return html(res, 200, loginForm('/admin/login'));
   if (url.pathname === '/admin/login' && req.method === 'POST') {
-    if (!config.adminPassword) return html(res, 503, '<h1>관리자 비밀번호가 설정되지 않았습니다.</h1>');
+    if (!config.adminPassword) return html(res, 503, '<h1>Admin password is not configured.</h1>');
     const body = await readBody(req);
-    if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm('/admin/login', '비밀번호가 올바르지 않습니다'));
+    if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm('/admin/login', 'Invalid password'));
     const session = createAdminSession();
     return redirect(res, '/admin', { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
   }
   if (url.pathname.startsWith('/admin/auth/') && req.method === 'GET') {
-    if (!consumeAdminAuthToken(url.pathname.split('/').pop())) return html(res, 410, '<h1>만료된 운영자 인증 QR입니다.</h1>');
+    if (!consumeAdminAuthToken(url.pathname.split('/').pop())) return html(res, 410, '<h1>Expired admin auth QR.</h1>');
     const session = createAdminSession();
     return redirect(res, '/admin', { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
   }
@@ -493,11 +511,11 @@ async function handleHttp(req, res) {
   if (claimMatch) {
     const [, token, action] = claimMatch;
     const row = claimRow(token);
-    if (!row) return html(res, 404, '<h1>유효하지 않은 수령 QR입니다.</h1>');
+    if (!row) return html(res, 404, '<h1>Invalid claim QR.</h1>');
     if (action === 'login' && req.method === 'POST') {
-      if (!config.adminPassword) return html(res, 503, '<h1>관리자 비밀번호가 설정되지 않았습니다.</h1>');
+      if (!config.adminPassword) return html(res, 503, '<h1>Admin password is not configured.</h1>');
       const body = await readBody(req);
-      if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm(`/claim/${token}/login`, '비밀번호가 올바르지 않습니다'));
+      if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm(`/claim/${token}/login`, 'Invalid password'));
       const session = createAdminSession();
       return redirect(res, `/claim/${token}`, { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
     }
@@ -570,8 +588,8 @@ const adminQrInterval = setInterval(() => getOrCreateDailyAuthToken(), 60_000);
 getOrCreateDailyAuthToken();
 
 httpServer.listen(config.port, config.bindHost, () => {
-  log('boot', `서버 시작 ${config.bindHost}:${config.port} (${config.publicBaseUrl})`);
-  if (!config.adminPassword) log('boot', '경고: ADMIN_PASSWORD가 없어 관리자 로그인이 비활성화되었습니다.');
+  log('boot', `server started ${config.bindHost}:${config.port} (${config.publicBaseUrl})`);
+  if (!config.adminPassword) log('boot', 'warning: ADMIN_PASSWORD is not set; admin login is disabled.');
 });
 
 function shutdown() {

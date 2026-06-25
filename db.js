@@ -53,6 +53,7 @@ db.exec(`
     invalidated_at TEXT,
     claim_token TEXT UNIQUE,
     claimed_at TEXT,
+    artifact_index INTEGER,
     FOREIGN KEY (session_id) REFERENCES play_log(session_id)
   );
 
@@ -76,6 +77,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_play_log_started
     ON play_log(started_at);
 `);
+
+const resultTokenColumns = db.prepare('PRAGMA table_info(result_tokens)').all().map((column) => column.name);
+if (!resultTokenColumns.includes('artifact_index')) {
+  db.exec('ALTER TABLE result_tokens ADD COLUMN artifact_index INTEGER');
+}
 
 export function isoNow() {
   return DateTime.utc().toISO();
@@ -102,4 +108,3 @@ export function cleanupExpired() {
   const now = isoNow();
   db.prepare('DELETE FROM admin_sessions WHERE expires_at <= ?').run(now);
 }
-
