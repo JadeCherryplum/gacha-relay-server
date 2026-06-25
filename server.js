@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, extname, isAbsolute, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DateTime } from 'luxon';
 import QRCode from 'qrcode';
@@ -32,6 +32,14 @@ const kiosks = new Map();
 const tokenIndex = new Map();
 const VALID_ACTIONS = new Set(['left', 'right', 'up', 'down', 'grab']);
 const VALID_PHASES = new Set(['start', 'hold', 'stop']);
+const GUI_ROOT = join(__dirname, 'public', 'gui');
+const STATIC_TYPES = new Map([
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.svg', 'image/svg+xml'],
+]);
 
 function log(tag, ...args) {
   console.log(`[${tag}]`, ...args);
@@ -54,6 +62,34 @@ function json(res, status, payload) {
 function html(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
   res.end(body);
+}
+
+function serveGuiAsset(res, pathname) {
+  let relativePath;
+  try {
+    relativePath = decodeURIComponent(pathname.slice('/gui/'.length));
+  } catch {
+    return json(res, 400, { error: 'bad_request' });
+  }
+
+  const normalizedPath = normalize(relativePath);
+  if (!relativePath || isAbsolute(normalizedPath) || normalizedPath.startsWith('..') || normalizedPath.includes(`..${sep}`)) {
+    return json(res, 400, { error: 'bad_request' });
+  }
+
+  const contentType = STATIC_TYPES.get(extname(normalizedPath).toLowerCase());
+  if (!contentType) return json(res, 404, { error: 'not_found' });
+
+  try {
+    const bytes = readFileSync(join(GUI_ROOT, normalizedPath));
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600',
+    });
+    return res.end(bytes);
+  } catch {
+    return json(res, 404, { error: 'not_found' });
+  }
 }
 
 function redirect(res, location, headers = {}) {
@@ -417,6 +453,7 @@ async function handleHttp(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end(ARTIFACTS_JSON);
   }
+  if (url.pathname.startsWith('/gui/')) return serveGuiAsset(res, url.pathname);
   if (url.pathname === '/play') return html(res, 200, PLAY_HTML);
 
   if (url.pathname.startsWith('/api/results/') && req.method === 'GET') {
