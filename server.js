@@ -172,6 +172,7 @@ function startSession(kioskId, playToken, playerSocket) {
     startedAt: Date.now(),
     state: 'playing',
     result: null,
+    resultRevealed: false,
     artifactIndex: null,
     sessionTimer: null,
     startTimer: null,
@@ -210,6 +211,7 @@ function claimSession(kioskId, playToken, playerSocket) {
     startedAt: null,
     state: 'claimed',
     result: null,
+    resultRevealed: false,
     artifactIndex: null,
     sessionTimer: null,
     startTimer: null,
@@ -234,7 +236,8 @@ function clearSessionTimers(session) {
 
 function revealResult(kioskId) {
   const session = kiosks.get(kioskId)?.activeSession;
-  if (!session?.result) return;
+  if (!session?.result || session.resultRevealed) return;
+  session.resultRevealed = true;
   const visibleAt = isoNow();
   db.prepare('UPDATE result_tokens SET visible_at = COALESCE(visible_at, ?) WHERE session_id = ?')
     .run(visibleAt, session.sessionId);
@@ -315,6 +318,7 @@ function handleAnimationDone(kioskId) {
   const session = kiosks.get(kioskId)?.activeSession;
   if (!session || session.state !== 'waiting_animation_done') return;
   clearTimeout(session.phaseTimer);
+  revealResult(kioskId);
   endSession(kioskId, 'completed');
 }
 

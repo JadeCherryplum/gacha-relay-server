@@ -219,16 +219,17 @@ async function run() {
   assert((await fetch(`${BASE}/api/results/${timeoutToken}`)).status === 410, '타임아웃 결과 링크 만료 실패');
   console.log('  ✓ 추첨 없이 오류 종료');
 
-  console.log('\n=== animation_done 타임아웃 ===');
+  console.log('\n=== animation_done 결과 공개 fallback ===');
   const animationPair = await createPlayable('claw-05');
   const animationResult = await completeGrab(animationPair, false);
+  send(animationPair.kiosk, { type: 'session_event', event: 'animation_done' });
   const animationMobileResult = await waitFor(
     () => animationPair.player.messages.find((m) => m.type === 'result'),
-    'animation_done 타임아웃 후 모바일 결과 없음',
+    'animation_done fallback 후 모바일 결과 없음',
     2000,
   );
-  assert(animationMobileResult.result === animationResult.result, 'animation_done 타임아웃 결과 불일치');
-  console.log('  ✓ 확정 결과 유지 후 모바일 전달');
+  assert(animationMobileResult.result === animationResult.result, 'animation_done fallback 결과 불일치');
+  console.log('  ✓ result_visible 없이도 모바일 결과 전달');
 
   try { idlePlayer.close(); idleKiosk.close(); } catch {}
   for (const pair of [first, left, right, failPair, timeoutPair, animationPair]) {
