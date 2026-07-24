@@ -132,6 +132,10 @@ async function run() {
   console.log('\n=== HTTP and admin ===');
   const page = await fetch(`${BASE}/play`);
   assert(page.ok && (await page.text()).includes('결과 확인 중'), 'mobile page failed');
+  const previewPage = await fetch(`${BASE}/play-test`);
+  assert(previewPage.ok && (await previewPage.text()).includes('/play?preview=start'), 'mobile preview page failed');
+  const previewMode = await fetch(`${BASE}/play?preview=gold`);
+  assert(previewMode.ok && (await previewMode.text()).includes('const preview'), 'mobile preview mode failed');
   const timerFont = await fetch(`${BASE}/gui/Font/GapyeongHanseokbongB.otf`);
   assert(timerFont.ok && timerFont.headers.get('content-type') === 'font/otf', 'timer font asset failed');
   const artifacts = await (await fetch(`${BASE}/artifacts.json`)).json();

@@ -21,6 +21,7 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLAY_HTML = readFileSync(join(__dirname, 'public', 'play.html'), 'utf8');
+const PLAY_TEST_HTML = readFileSync(join(__dirname, 'public', 'play-test.html'), 'utf8');
 const ADMIN_HTML = readFileSync(join(__dirname, 'public', 'admin.html'), 'utf8');
 const ARTIFACTS_JSON = readFileSync(join(__dirname, 'public', 'artifacts.json'), 'utf8');
 const ARTIFACT_DATA = JSON.parse(ARTIFACTS_JSON.replace(/^\uFEFF/, ''));
@@ -516,6 +517,7 @@ async function handleHttp(req, res) {
   }
   if (url.pathname.startsWith('/gui/')) return serveGuiAsset(res, url.pathname);
   if (url.pathname === '/play') return html(res, 200, PLAY_HTML);
+  if (url.pathname === '/play-test') return html(res, 200, PLAY_TEST_HTML);
 
   if (url.pathname.startsWith('/api/results/') && req.method === 'GET') {
     const token = url.pathname.split('/').pop();
