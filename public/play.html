@@ -56,7 +56,8 @@
     .prize-stage{position:absolute;inset:0;overflow:hidden;background:#2a130d}
     .prize-bg{z-index:1}
     .prize-result{z-index:2;object-fit:contain}
-    .prize-character{position:absolute;left:50%;bottom:6.2%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
+    .prize-character{position:absolute;left:50%;bottom:4.4%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
+    .prize-character.gold{bottom:6.2%}
     .prize-confetti{z-index:4}
     .claim-qr{position:absolute;left:18.4%;top:21.5%;width:18.8%;aspect-ratio:1;z-index:5;background:#fff;padding:.8%;box-shadow:0 4px 10px rgba(0,0,0,.26)}
     .claim-prize-name{display:none}
@@ -203,7 +204,9 @@
 
       if(prize){
         const index=prizeSequenceIndex(data);
-        document.querySelector('#prizeCharacter').src=`/gui/sequence/${index}.webp`;
+        const prizeCharacter=document.querySelector('#prizeCharacter');
+        prizeCharacter.src=`/gui/sequence/${index}.webp`;
+        prizeCharacter.classList.toggle('gold',data.result==='gold');
         document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
         return;
       }
