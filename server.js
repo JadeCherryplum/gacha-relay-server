@@ -39,6 +39,8 @@ const STATIC_TYPES = new Map([
   ['.jpeg', 'image/jpeg'],
   ['.webp', 'image/webp'],
   ['.svg', 'image/svg+xml'],
+  ['.otf', 'font/otf'],
+  ['.ttf', 'font/ttf'],
 ]);
 
 function log(tag, ...args) {
