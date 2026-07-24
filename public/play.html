@@ -6,8 +6,11 @@
   <title>백제 왕실 황금보물을 찾아라!</title>
   <style>
     @font-face{font-family:GapyeongWave;src:url('/gui/Font/GapyeongWave.otf') format('opentype');font-display:swap}
-    @font-face{font-family:GapyeongHanseok;src:url('/gui/Font/GapyeongHanseokbongB.otf') format('opentype');font-weight:700;font-display:swap}
+    @font-face{font-family:GapyeongHanseokB;src:url('/gui/Font/GapyeongHanseokbongB.otf') format('opentype');font-display:swap}
+    @font-face{font-family:GapyeongHanseokR;src:url('/gui/Font/GapyeongHanseokbongR.otf') format('opentype');font-display:swap}
+    @font-face{font-family:GapyeongHanseokL;src:url('/gui/Font/GapyeongHanseokbongL.otf') format('opentype');font-display:swap}
     @font-face{font-family:ChosunGs;src:url('/gui/Font/ChosunGs.TTF') format('truetype');font-display:swap}
+    @font-face{font-family:ChosunGsHanja;src:url('/gui/Font/ChosunGs.TTF') format('truetype');unicode-range:U+3400-4DBF,U+4E00-9FFF,U+F900-FAFF;font-display:swap}
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
     html,body{margin:0;min-height:100%;font-family:ChosunGs,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;background:#2a130d;color:#f7ead0}
     body{min-height:100dvh;overflow:hidden;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);background:#2a130d url('/gui/Bg.png') center/cover no-repeat}
@@ -27,7 +30,7 @@
 
     .play-timer{position:absolute;top:13.2%;left:50%;width:50.2%;max-width:440px;transform:translateX(-50%)}
     .timer-bg{display:block;width:100%;height:auto}
-    .timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:.2em;font-family:GapyeongHanseok,serif;font-weight:700;font-size:clamp(28px,8vw,46px);letter-spacing:.04em;color:#fff0c2;text-shadow:0 2px 5px rgba(0,0,0,.45)}
+    .timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:.2em;font-family:GapyeongHanseokB,serif;font-size:clamp(28px,8vw,46px);letter-spacing:.04em;color:#fff0c2;text-shadow:0 2px 5px rgba(0,0,0,.45)}
     .pad{position:absolute;top:30.5%;left:50%;width:77%;max-width:760px;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:url('/gui/bg_center.png') center/76% 76% no-repeat;filter:drop-shadow(0 18px 28px rgba(0,0,0,.32))}
     .control-button{position:absolute;width:32%;height:32%;display:flex;align-items:center;justify-content:center;transition:filter .08s ease,opacity .12s ease}
     .control-button:disabled,.grab-button:disabled{opacity:.45;filter:grayscale(.15)}
@@ -46,9 +49,9 @@
     .relic-frame.empty{background-image:none;min-height:24%;aspect-ratio:auto}
     .relic-frame.empty .relic-img{display:none}
     .relic-img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(0,0,0,.28))}
-    .name-box{position:relative;width:88%;min-height:52px;margin:5.5% auto 1.7%;display:flex;align-items:center;justify-content:center;padding:8px 22px;color:#fff2cc;font-family:GapyeongHanseok,serif;font-size:clamp(18px,5.2vw,30px);line-height:1.15;text-shadow:0 2px 4px rgba(0,0,0,.45)}
+    .name-box{position:relative;width:88%;min-height:52px;margin:5.5% auto 1.7%;display:flex;align-items:center;justify-content:center;padding:8px 22px;color:#fff2cc;font-family:ChosunGsHanja,GapyeongHanseokR,serif;font-size:clamp(18px,5.2vw,30px);line-height:1.15;text-shadow:0 2px 4px rgba(0,0,0,.45)}
     .result-line{width:78%;height:auto;margin:1% auto 3%}
-    .description{width:86%;max-height:27%;overflow:auto;margin:0 auto;color:#f2dfbd;font-size:clamp(13px,3.5vw,18px);line-height:1.62;word-break:keep-all;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+    .description{width:86%;max-height:27%;overflow:auto;margin:0 auto;color:#f2dfbd;font-family:ChosunGsHanja,GapyeongHanseokL,serif;font-size:clamp(13px,3.5vw,18px);line-height:1.62;word-break:keep-all;text-shadow:0 1px 3px rgba(0,0,0,.4)}
 
     .prize-stage{position:absolute;inset:0;overflow:hidden;background:#2a130d}
     .prize-bg{z-index:1}
@@ -56,10 +59,10 @@
     .prize-character{position:absolute;left:50%;bottom:4.4%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
     .prize-confetti{z-index:4}
     .claim-qr{position:absolute;left:18.4%;top:21.5%;width:18.8%;aspect-ratio:1;z-index:5;background:#fff;padding:.8%;box-shadow:0 4px 10px rgba(0,0,0,.26)}
-    .claim-prize-name{position:absolute;left:41%;right:8%;top:22%;z-index:5;color:#fff7e4;font-family:GapyeongHanseok,serif;font-size:clamp(16px,4.8vw,27px);line-height:1.22;text-align:left;text-shadow:0 2px 5px rgba(0,0,0,.45);word-break:keep-all}
+    .claim-prize-name{position:absolute;left:41%;right:8%;top:22%;z-index:5;color:#fff7e4;font-family:ChosunGsHanja,GapyeongHanseokR,serif;font-size:clamp(16px,4.8vw,27px);line-height:1.22;text-align:left;text-shadow:0 2px 5px rgba(0,0,0,.45);word-break:keep-all}
 
     .notice-panel{margin:auto;width:86%;padding:28px 22px;border-radius:22px;background:rgba(33,15,9,.82);border:1px solid rgba(255,225,170,.28);text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.35)}
-    .notice-panel h1{margin:0 0 12px;font-family:GapyeongHanseok,serif;font-size:24px;color:#fff0c2}
+    .notice-panel h1{margin:0 0 12px;font-family:GapyeongHanseokB,serif;font-size:24px;color:#fff0c2}
     .notice-panel p{margin:0;color:#ead1a7;line-height:1.6}
     .spinner{width:54px;height:54px;border:5px solid rgba(255,234,190,.25);border-top-color:#f7d378;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 22px}
     @keyframes spin{to{transform:rotate(360deg)}}
