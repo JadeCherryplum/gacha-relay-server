@@ -13,10 +13,10 @@ const GOLD_PRIZE = {
 export const SILVER_PRIZES = [
   { id: 'lucy_doll', name: '루시(국가유산청 캐릭터 인형)', grade: 'silver', scope: 'daily', count: 10 },
   { id: 'usb', name: 'USB', grade: 'silver', scope: 'daily', count: 3 },
-  { id: 'gyeyangbae', name: '계양배', grade: 'silver', scope: 'exhibition', count: 1 },
-  { id: 'wooden_pillow', name: '목침', grade: 'silver', scope: 'exhibition', count: 1 },
-  { id: 'handkerchief', name: '손수건', grade: 'silver', scope: 'exhibition', count: 1 },
-  { id: 'ceramic_lunchbox', name: '도자기 도시락', grade: 'silver', scope: 'exhibition', count: 1 },
+  { id: 'gyeyangbae', name: '계양배', grade: 'silver', scope: 'daily', count: 1 },
+  { id: 'wooden_pillow', name: '목침', grade: 'silver', scope: 'daily', count: 1 },
+  { id: 'handkerchief', name: '손수건', grade: 'silver', scope: 'daily', count: 1 },
+  { id: 'ceramic_lunchbox', name: '도자기 도시락', grade: 'silver', scope: 'daily', count: 1 },
 ];
 
 export const PRIZES = [GOLD_PRIZE, ...SILVER_PRIZES];
