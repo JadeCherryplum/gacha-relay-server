@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { db } from '../db.js';
 import { config } from '../config.js';
 
-const DEFAULT_GOLD_DATES = ['2026-07-07', '2026-07-19', '2026-07-25'];
+const DEFAULT_GOLD_DATES = ['2026-09-07', '2026-09-19', '2026-09-25'];
 
 function parseProbability(name, fallback) {
   const value = Number.parseFloat(process.env[name] ?? '');
