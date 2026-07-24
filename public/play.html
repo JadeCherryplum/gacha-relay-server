@@ -22,7 +22,7 @@
 
     .start-title{position:absolute;top:13%;left:50%;width:79%;transform:translateX(-50%);z-index:2}
     .title-machine{position:absolute;top:28.7%;left:49%;width:66%;max-height:52%;object-fit:contain;transform:translateX(-50%);filter:drop-shadow(0 16px 28px rgba(0,0,0,.35));z-index:2}
-    .title-character{position:absolute;left:72.5%;bottom:21.7%;width:39.5%;transform:translateX(-50%);z-index:3;pointer-events:none}
+    .title-character{position:absolute;left:72.5%;bottom:23.2%;width:39.5%;transform:translateX(-50%);z-index:3;pointer-events:none}
     .start-button{position:absolute;left:50%;bottom:11.2%;width:66%;max-width:640px;transform:translateX(-50%);z-index:4}
     .start-button img,.control-button img,.grab-button img{display:block;width:100%;height:auto;pointer-events:none}
     .start-button:active{transform:translateX(-50%) scale(.95)}
@@ -30,7 +30,7 @@
 
     .play-timer{position:absolute;top:13.2%;left:50%;width:50.2%;max-width:440px;transform:translateX(-50%)}
     .timer-bg{display:block;width:100%;height:auto}
-    .timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-top:.2em;font-family:GapyeongHanseokB,serif;font-size:clamp(28px,8vw,46px);letter-spacing:.04em;color:#fff0c2;text-shadow:0 2px 5px rgba(0,0,0,.45)}
+    .timer-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding-bottom:.12em;font-family:GapyeongHanseokB,serif;font-size:clamp(28px,8vw,46px);letter-spacing:.04em;color:#fff0c2;text-shadow:0 2px 5px rgba(0,0,0,.45)}
     .pad{position:absolute;top:30.5%;left:50%;width:77%;max-width:760px;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:url('/gui/bg_center.png') center/76% 76% no-repeat;filter:drop-shadow(0 18px 28px rgba(0,0,0,.32))}
     .control-button{position:absolute;width:32%;height:32%;display:flex;align-items:center;justify-content:center;transition:filter .08s ease,opacity .12s ease}
     .control-button:disabled,.grab-button:disabled{opacity:.45;filter:grayscale(.15)}
@@ -56,17 +56,17 @@
     .prize-stage{position:absolute;inset:0;overflow:hidden;background:#2a130d}
     .prize-bg{z-index:1}
     .prize-result{z-index:2;object-fit:contain}
-    .prize-character{position:absolute;left:50%;bottom:4.4%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
+    .prize-character{position:absolute;left:50%;bottom:6.2%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
     .prize-confetti{z-index:4}
     .claim-qr{position:absolute;left:18.4%;top:21.5%;width:18.8%;aspect-ratio:1;z-index:5;background:#fff;padding:.8%;box-shadow:0 4px 10px rgba(0,0,0,.26)}
-    .claim-prize-name{position:absolute;left:41%;right:8%;top:22%;z-index:5;color:#fff7e4;font-family:ChosunGsHanja,GapyeongHanseokR,serif;font-size:clamp(16px,4.8vw,27px);line-height:1.22;text-align:left;text-shadow:0 2px 5px rgba(0,0,0,.45);word-break:keep-all}
+    .claim-prize-name{display:none}
 
     .notice-panel{margin:auto;width:86%;padding:28px 22px;border-radius:22px;background:rgba(33,15,9,.82);border:1px solid rgba(255,225,170,.28);text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.35)}
     .notice-panel h1{margin:0 0 12px;font-family:GapyeongHanseokB,serif;font-size:24px;color:#fff0c2}
     .notice-panel p{margin:0;color:#ead1a7;line-height:1.6}
     .spinner{width:54px;height:54px;border:5px solid rgba(255,234,190,.25);border-top-color:#f7d378;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 22px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media (max-height:720px){.claim-qr{width:17%;top:21.8%}.claim-prize-name{font-size:clamp(14px,4vw,22px)}}
+    @media (max-height:720px){.claim-qr{width:17%;top:21.8%}}
   </style>
 </head>
 <body>
@@ -204,7 +204,6 @@
       if(prize){
         const index=prizeSequenceIndex(data);
         document.querySelector('#prizeCharacter').src=`/gui/sequence/${index}.webp`;
-        document.querySelector('#claimPrizeName').textContent=data.prizeName||'당첨 상품';
         document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
         return;
       }
