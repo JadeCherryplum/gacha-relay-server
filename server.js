@@ -8,7 +8,7 @@ import QRCode from 'qrcode';
 import { WebSocketServer } from 'ws';
 import { config } from './config.js';
 import { db, cleanupExpired, closeAt, isoNow, localNow } from './db.js';
-import { resolveGrab } from './gacha.js';
+import { prizeInventory, resolveGrab } from './gacha.js';
 import {
   adminCookie,
   consumeAdminAuthToken,
@@ -241,12 +241,14 @@ function revealResult(kioskId) {
   const visibleAt = isoNow();
   db.prepare('UPDATE result_tokens SET visible_at = COALESCE(visible_at, ?) WHERE session_id = ?')
     .run(visibleAt, session.sessionId);
-  const row = db.prepare('SELECT claim_token, artifact_index FROM result_tokens WHERE session_id = ?').get(session.sessionId);
+  const row = db.prepare('SELECT claim_token, artifact_index, prize_id, prize_name FROM result_tokens WHERE session_id = ?').get(session.sessionId);
   send(session.playerSocket, {
     type: 'result',
     result: session.result,
     resultUrl: session.resultUrl,
     artifactIndex: row?.artifact_index ?? session.artifactIndex ?? null,
+    prizeId: row?.prize_id ?? session.prizeId ?? null,
+    prizeName: row?.prize_name ?? session.prizeName ?? null,
     claimUrl: row?.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
   });
 }
@@ -296,7 +298,10 @@ function handleGrabResolved(kioskId, msg = {}) {
   clearTimeout(session.phaseTimer);
 
   const physicallyGrabbed = msg.grabbed !== false;
-  session.result = physicallyGrabbed ? resolveGrab(kioskId, session.sessionId) : 'fail';
+  const resolved = physicallyGrabbed ? resolveGrab(kioskId, session.sessionId) : { result: 'fail' };
+  session.result = resolved.result;
+  session.prizeId = resolved.prizeId ?? null;
+  session.prizeName = resolved.prizeName ?? null;
   session.artifactIndex = physicallyGrabbed ? randomArtifactIndex() : null;
   session.state = 'waiting_animation_done';
   const claimToken = session.result === 'gold' || session.result === 'silver' ? randomToken() : null;
@@ -304,9 +309,15 @@ function handleGrabResolved(kioskId, msg = {}) {
     UPDATE play_log SET resolved_at = ?, result = ? WHERE session_id = ?
   `).run(isoNow(), session.result, session.sessionId);
   db.prepare(`
-    UPDATE result_tokens SET result = ?, claim_token = ?, artifact_index = ? WHERE session_id = ?
-  `).run(session.result, claimToken, session.artifactIndex, session.sessionId);
-  send(kiosk.socket, { type: 'grab_result', result: session.result, artifactIndex: session.artifactIndex });
+    UPDATE result_tokens SET result = ?, claim_token = ?, artifact_index = ?, prize_id = ?, prize_name = ? WHERE session_id = ?
+  `).run(session.result, claimToken, session.artifactIndex, session.prizeId, session.prizeName, session.sessionId);
+  send(kiosk.socket, {
+    type: 'grab_result',
+    result: session.result,
+    artifactIndex: session.artifactIndex,
+    prizeId: session.prizeId,
+    prizeName: session.prizeName,
+  });
 
   session.phaseTimer = setTimeout(() => {
     revealResult(kioskId);
@@ -451,6 +462,8 @@ function resultPayload(row) {
     status: 'finished',
     result: row.result,
     artifactIndex: row.artifact_index ?? null,
+    prizeId: row.prize_id ?? null,
+    prizeName: row.prize_name ?? null,
     claimUrl: row.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
     expiresAt: row.expires_at,
   };
@@ -461,11 +474,11 @@ function adminPageData() {
   const authUrl = auth ? `${config.publicBaseUrl}/admin/auth/${auth.token}` : null;
   const slots = db.prepare('SELECT * FROM gold_slots ORDER BY start_at DESC LIMIT 20').all();
   const claims = db.prepare(`
-    SELECT result, kiosk_id, visible_at, claimed_at
+    SELECT result, prize_id, prize_name, kiosk_id, visible_at, claimed_at
     FROM result_tokens WHERE result IN ('gold', 'silver')
     ORDER BY created_at DESC LIMIT 30
   `).all();
-  return { authUrl, slots, claims, now: localNow().toISO() };
+  return { authUrl, slots, inventory: prizeInventory(localNow()), claims, now: localNow().toISO() };
 }
 
 function claimRow(token) {
@@ -488,7 +501,7 @@ function claimPage(row) {
   const button = row.claimed_at || expired ? '' : `<form method="post" action="/claim/${row.claim_token}/complete"><button>수령 완료 처리</button></form>`;
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>상품 수령 확인</title><style>body{font-family:sans-serif;max-width:520px;margin:40px auto;padding:20px}dt{color:#666;margin-top:18px}dd{font-size:22px;margin:4px 0}button{font-size:20px;padding:16px;width:100%;margin-top:28px}</style>
-  <h1>상품 수령 확인</h1><dl><dt>상품 종류</dt><dd>${row.result.toUpperCase()}</dd><dt>당첨 시각</dt><dd>${row.resolved_at}</dd><dt>키오스크 ID</dt><dd>${row.kiosk_id}</dd><dt>수령 상태</dt><dd>${status}</dd></dl>${button}</html>`;
+  <h1>상품 수령 확인</h1><dl><dt>상품 종류</dt><dd>${row.result.toUpperCase()}</dd><dt>상품명</dt><dd>${row.prize_name ?? row.result.toUpperCase()}</dd><dt>당첨 시각</dt><dd>${row.resolved_at}</dd><dt>키오스크 ID</dt><dd>${row.kiosk_id}</dd><dt>수령 상태</dt><dd>${status}</dd></dl>${button}</html>`;
 }
 async function handleHttp(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
@@ -582,7 +595,7 @@ async function handleHttp(req, res) {
     const where = status === 'claimed' ? 'AND claimed_at IS NOT NULL' : status === 'pending' ? 'AND claimed_at IS NULL' : '';
     return json(res, 200, {
       claims: db.prepare(`
-        SELECT result, kiosk_id, resolved_at, expires_at, claimed_at
+        SELECT result, prize_id, prize_name, kiosk_id, resolved_at, expires_at, claimed_at
         FROM result_tokens JOIN play_log USING(session_id)
         WHERE result IN ('gold', 'silver') ${where}
         ORDER BY created_at DESC

@@ -54,7 +54,21 @@ db.exec(`
     claim_token TEXT UNIQUE,
     claimed_at TEXT,
     artifact_index INTEGER,
+    prize_id TEXT,
+    prize_name TEXT,
     FOREIGN KEY (session_id) REFERENCES play_log(session_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS prize_awards (
+    id INTEGER PRIMARY KEY,
+    prize_id TEXT NOT NULL,
+    prize_name TEXT NOT NULL,
+    grade TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    period_key TEXT NOT NULL,
+    session_id TEXT NOT NULL UNIQUE,
+    kiosk_id TEXT NOT NULL,
+    awarded_at TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS admin_auth_tokens (
@@ -76,11 +90,19 @@ db.exec(`
     ON result_tokens(claim_token);
   CREATE INDEX IF NOT EXISTS idx_play_log_started
     ON play_log(started_at);
+  CREATE INDEX IF NOT EXISTS idx_prize_awards_prize_period
+    ON prize_awards(prize_id, period_key);
 `);
 
 const resultTokenColumns = db.prepare('PRAGMA table_info(result_tokens)').all().map((column) => column.name);
 if (!resultTokenColumns.includes('artifact_index')) {
   db.exec('ALTER TABLE result_tokens ADD COLUMN artifact_index INTEGER');
+}
+if (!resultTokenColumns.includes('prize_id')) {
+  db.exec('ALTER TABLE result_tokens ADD COLUMN prize_id TEXT');
+}
+if (!resultTokenColumns.includes('prize_name')) {
+  db.exec('ALTER TABLE result_tokens ADD COLUMN prize_name TEXT');
 }
 
 export function isoNow() {
