@@ -528,9 +528,15 @@ async function handleHttp(req, res) {
   if (url.pathname === '/qr' && req.method === 'GET') {
     const text = url.searchParams.get('text');
     if (!text || text.length > 2048) return json(res, 400, { error: 'bad_request' });
-    const svg = await QRCode.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' });
-    res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' });
-    return res.end(svg);
+    const png = await QRCode.toBuffer(text, {
+      type: 'png',
+      width: 512,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+    res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' });
+    return res.end(png);
   }
 
   if (url.pathname === '/admin/login' && req.method === 'GET') return html(res, 200, loginForm('/admin/login'));
