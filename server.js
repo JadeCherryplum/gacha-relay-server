@@ -481,7 +481,7 @@ function adminPageData() {
     FROM result_tokens WHERE result IN ('gold', 'silver')
     ORDER BY created_at DESC LIMIT 30
   `).all();
-  return { authUrl, slots, inventory: prizeInventory(localNow()), claims, now: localNow().toISO() };
+  return { authUrl, slots, inventory: prizeInventory(localNow()), claims, now: localNow().toISO(), timezone: config.timezone };
 }
 
 function claimRow(token) {

@@ -20,11 +20,18 @@ h1,h2{font-weight:700}img{width:260px;max-width:100%}table{width:100%;border-col
 <script>
 const data=__ADMIN_DATA__;
 const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const dt=(v)=>{
+  if(!v)return '';
+  const d=new Date(v);
+  if(Number.isNaN(d.getTime()))return esc(v);
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:data.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).map(p=>[p.type,p.value]));
+  return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+};
 const scopeLabel=(scope)=>scope==='daily'?'매일':'전시 기간';
 const gradeLabel=(grade)=>grade==='gold'?'금':'은';
 document.querySelector('#auth').innerHTML=data.authUrl?`<img src="/qr?text=${encodeURIComponent(data.authUrl)}"><p class="muted">운영 시작 1시간 전부터 운영 종료까지 유효합니다.</p>`:'<p>현재 인증 QR 발급 시간이 아닙니다.</p>';
 document.querySelector('#inventory').innerHTML=`<table><tr><th>등급</th><th>상품</th><th>범위</th><th>지급</th><th>남은 수량</th></tr>${data.inventory.map(x=>`<tr><td><span class="pill">${gradeLabel(x.grade)}</span></td><td>${esc(x.name)}</td><td>${scopeLabel(x.scope)}<br><span class="muted">${esc(x.periodKey)}</span></td><td>${x.awarded} / ${x.total}</td><td class="${x.remaining>0?'ok':'done'}">${x.remaining}</td></tr>`).join('')}</table>`;
-document.querySelector('#slots').innerHTML=`<table><tr><th>시작</th><th>종료</th><th>확률</th><th>상태</th></tr>${data.slots.map(x=>`<tr><td>${esc(x.start_at)}</td><td>${esc(x.end_at)}</td><td>${x.p_start} -> ${x.p_end}</td><td>${x.consumed_at?'<span class="done">소비됨</span>':'<span class="warn">대기</span>'}</td></tr>`).join('')}</table>`;
-document.querySelector('#claims').innerHTML=`<table><tr><th>등급</th><th>상품</th><th>키오스크</th><th>당첨 시각</th><th>수령</th></tr>${data.claims.map(x=>`<tr><td>${gradeLabel(x.result)}</td><td>${esc(x.prize_name||x.result)}</td><td>${esc(x.kiosk_id)}</td><td>${esc(x.visible_at)}</td><td>${x.claimed_at?'완료 '+esc(x.claimed_at):'미수령'}</td></tr>`).join('')}</table>`;
+document.querySelector('#slots').innerHTML=`<table><tr><th>시작</th><th>종료</th><th>확률</th><th>상태</th></tr>${data.slots.map(x=>`<tr><td>${dt(x.start_at)}</td><td>${dt(x.end_at)}</td><td>${x.p_start} -> ${x.p_end}</td><td>${x.consumed_at?'<span class="done">소비됨</span>':'<span class="warn">대기</span>'}</td></tr>`).join('')}</table>`;
+document.querySelector('#claims').innerHTML=`<table><tr><th>등급</th><th>상품</th><th>키오스크</th><th>당첨 시각</th><th>수령</th></tr>${data.claims.map(x=>`<tr><td>${gradeLabel(x.result)}</td><td>${esc(x.prize_name||x.result)}</td><td>${esc(x.kiosk_id)}</td><td>${dt(x.visible_at)}</td><td>${x.claimed_at?'완료 '+dt(x.claimed_at):'미수령'}</td></tr>`).join('')}</table>`;
 </script>
 </body></html>
