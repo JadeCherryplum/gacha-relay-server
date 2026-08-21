@@ -11,7 +11,6 @@ const GOLD_PRIZE = {
 };
 
 export const SILVER_PRIZES = [
-  { id: 'lucy_doll', name: '루시(국가유산청 캐릭터 인형)', grade: 'silver', scope: 'daily', count: 10 },
   { id: 'usb', name: 'USB', grade: 'silver', scope: 'daily', count: 3 },
   { id: 'gyeyangbae', name: '계양배', grade: 'silver', scope: 'daily', count: 1 },
   { id: 'wooden_pillow', name: '목침', grade: 'silver', scope: 'daily', count: 1 },

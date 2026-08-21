@@ -169,7 +169,7 @@ async function run() {
 
   console.log('\n=== silver weighted inventory ===');
   const silverPairs = [];
-  for (let i = 0; i < 17; i += 1) {
+  for (let i = 0; i < 7; i += 1) {
     const pair = await createPlayable(`claw-silver-${i}`);
     silverPairs.push(pair);
     await completeGrab(pair);
@@ -177,7 +177,6 @@ async function run() {
   const silverResults = silverPairs.map((pair) => pair.kiosk.messages.find((m) => m.type === 'grab_result'));
   assert(silverResults.every((m) => m.result === 'silver' && m.prizeId && m.prizeName), 'silver prize payload missing');
   const counts = silverResults.reduce((map, result) => map.set(result.prizeId, (map.get(result.prizeId) ?? 0) + 1), new Map());
-  assert(counts.get('lucy_doll') === 10, 'lucy daily count mismatch');
   assert(counts.get('usb') === 3, 'usb daily count mismatch');
   assert(['gyeyangbae', 'wooden_pillow', 'handkerchief', 'ceramic_lunchbox'].every((id) => counts.get(id) === 1), 'single silver count mismatch');
   const noSilver = await createPlayable('claw-silver-empty');
