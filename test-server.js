@@ -91,7 +91,9 @@ async function adminLogin() {
     body: 'password=test-admin',
   });
   assert(response.status === 303, `admin login failed ${response.status}`);
-  return response.headers.get('set-cookie').split(';')[0];
+  const setCookie = response.headers.get('set-cookie');
+  assert(setCookie.includes('SameSite=Lax'), 'admin cookie must support QR login redirect flow');
+  return setCookie.split(';')[0];
 }
 
 async function seedGold(cookie, count = 1) {

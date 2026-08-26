@@ -40,7 +40,7 @@ export function getAdminSession(req) {
 
 export function adminCookie(token, expiresAt) {
   const secure = config.publicBaseUrl.startsWith('https://') ? '; Secure' : '';
-  return `${ADMIN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict; Expires=${expiresAt.toHTTP()}${secure}`;
+  return `${ADMIN_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Expires=${expiresAt.toHTTP()}${secure}`;
 }
 
 export function getOrCreateDailyAuthToken(now = localNow()) {
