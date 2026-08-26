@@ -91,7 +91,7 @@
         <button class="control-button down" data-action="down" aria-label="아래"><img src="/gui/Btn_down.png" alt="아래"></button>
       </div>
       <button id="grab" class="grab-button" aria-label="잡기"><img src="/gui/Btn_catch.png" alt="잡기"></button>
-      <div id="playStatus" class="status-text">연결 중...</div>
+      <div id="playStatus" class="status-text"></div>
     </div>
   </section>
 
@@ -247,7 +247,6 @@
       if(kind==='start')return show('start');
       if(kind==='playing'){
         document.querySelector('#timer').textContent='01:00';
-        document.querySelector('#playStatus').textContent='조작 가능';
         show('playing');
         return;
       }
@@ -284,7 +283,6 @@
           resultUrl=m.resultUrl;
           history.replaceState(null,'',m.resultUrl);
           document.querySelector('#timer').textContent=fmt(m.duration);
-          document.querySelector('#playStatus').textContent='조작 가능';
           show('playing');
           setControlsDisabled(false);
           bind();
