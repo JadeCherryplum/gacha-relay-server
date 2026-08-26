@@ -9,6 +9,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 const WS = `ws://127.0.0.1:${PORT}`;
 const DB_PATH = join(process.cwd(), 'data', 'integration-test.sqlite3');
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const todayLocal = DateTime.now().setZone('Asia/Seoul').startOf('day');
 
 for (const suffix of ['', '-shm', '-wal']) {
   try { rmSync(`${DB_PATH}${suffix}`, { force: true }); } catch {}
@@ -25,8 +26,13 @@ const server = spawn(process.execPath, ['server.js'], {
     ADMIN_PASSWORD: 'test-admin',
     OPEN_TIME: '00:00',
     CLOSE_TIME: '23:59',
+    TEST_OPERATION_START_DATE: todayLocal.minus({ days: 1 }).toISODate(),
+    NORMAL_OPERATION_START_DATE: todayLocal.plus({ days: 1 }).toISODate(),
+    NORMAL_OPERATION_END_DATE: todayLocal.plus({ days: 21 }).toISODate(),
     SILVER_P_START: '1',
     SILVER_P_END: '1',
+    TEST_DAILY_GOLD_COUNT: '1',
+    TEST_GOLD_P: '1',
     GRAB_STARTED_TIMEOUT_MS: '500',
     GRAB_RESOLVED_TIMEOUT_MS: '500',
     ANIMATION_DONE_TIMEOUT_MS: '500',
@@ -115,7 +121,7 @@ async function createPlayable(kioskId) {
   await waitFor(() => kiosk.messages.find((m) => m.type === 'player_claimed'), `${kioskId} player_claimed missing`);
   send(player, { type: 'start' });
   const started = await waitFor(() => player.messages.find((m) => m.type === 'session_started'), `${kioskId} session start missing`);
-  return { kiosk, player, started };
+  return { kiosk, player, started, issued };
 }
 
 async function completeGrab(pair, { grabbed = true, reveal = true, done = true } = {}) {
@@ -146,21 +152,19 @@ async function run() {
   const artifacts = await (await fetch(`${BASE}/artifacts.json`)).json();
   assert(artifacts.artifacts.length === 19, 'artifact count must be 19');
   const cookie = await adminLogin();
-  await seedGold(cookie, 3);
+  await seedGold(cookie, 2);
   const admin = await fetch(`${BASE}/admin`, { headers: { Cookie: cookie } });
   const adminHtml = await admin.text();
-  assert(admin.ok && adminHtml.includes('상품별 재고 현황'), 'admin inventory failed');
+  assert(admin.ok && adminHtml.includes('상품별 재고 현황') && adminHtml.includes('운영 상태'), 'admin inventory failed');
   console.log('  ✓ admin and artifact data');
 
-  console.log('\n=== gold count and claim ===');
+  console.log('\n=== test daily gold and claim ===');
   const goldPairs = [];
-  for (let i = 0; i < 3; i += 1) {
-    const pair = await createPlayable(`claw-gold-${i}`);
-    goldPairs.push(pair);
-    await completeGrab(pair);
-  }
+  const pair = await createPlayable('claw-gold-test-daily');
+  goldPairs.push(pair);
+  await completeGrab(pair);
   const goldResults = goldPairs.map((pair) => pair.kiosk.messages.find((m) => m.type === 'grab_result'));
-  assert(goldResults.every((m) => m.result === 'gold'), 'seeded gold slots should all award gold');
+  assert(goldResults.every((m) => m.result === 'gold'), 'test daily gold should award once');
   assert(goldResults.every((m) => m.prizeId === 'gold_crystal_led_tower' && m.prizeName), 'gold prize payload missing');
   const goldMobile = await waitFor(() => goldPairs[0].player.messages.find((m) => m.type === 'result'), 'gold mobile result missing');
   assert(goldMobile.result === 'gold' && goldMobile.claimUrl && goldMobile.prizeName, 'gold mobile payload missing');
@@ -170,11 +174,11 @@ async function run() {
   assert(claimPage.ok && (await claimPage.text()).includes('크리스탈 LED 정림사지 오층석탑'), 'claim prize name missing');
   const complete = await fetch(`${BASE}${claimPath}/complete`, { method: 'POST', redirect: 'manual', headers: { Cookie: cookie } });
   assert(complete.status === 303, 'claim complete failed');
-  console.log('  ✓ gold inventory and claim');
+  console.log('  ✓ test daily gold and claim');
 
   console.log('\n=== silver weighted inventory ===');
   const silverPairs = [];
-  for (let i = 0; i < 7; i += 1) {
+  for (let i = 0; i < 14; i += 1) {
     const pair = await createPlayable(`claw-silver-${i}`);
     silverPairs.push(pair);
     await completeGrab(pair);
@@ -182,8 +186,8 @@ async function run() {
   const silverResults = silverPairs.map((pair) => pair.kiosk.messages.find((m) => m.type === 'grab_result'));
   assert(silverResults.every((m) => m.result === 'silver' && m.prizeId && m.prizeName), 'silver prize payload missing');
   const counts = silverResults.reduce((map, result) => map.set(result.prizeId, (map.get(result.prizeId) ?? 0) + 1), new Map());
-  assert(counts.get('usb') === 3, 'usb daily count mismatch');
-  assert(['gyeyangbae', 'wooden_pillow', 'handkerchief', 'ceramic_lunchbox'].every((id) => counts.get(id) === 1), 'single silver count mismatch');
+  assert(counts.get('usb') === 6, 'usb rollover count mismatch');
+  assert(['gyeyangbae', 'wooden_pillow', 'handkerchief', 'ceramic_lunchbox'].every((id) => counts.get(id) === 2), 'single silver rollover count mismatch');
   const noSilver = await createPlayable('claw-silver-empty');
   const noSilverResult = await completeGrab(noSilver);
   assert(noSilverResult.result === 'fail' && !noSilverResult.prizeId && noSilverResult.artifactIndex !== null, 'silver depletion should fall back to artifact result');
@@ -199,6 +203,13 @@ async function run() {
   await waitFor(() => idlePlayer.messages.find((m) => m.type === 'claimed'), 'idle claimed missing');
   const idleEnded = await waitFor(() => idlePlayer.messages.find((m) => m.type === 'session_ended'), 'start timeout missing');
   assert(idleEnded.reason === 'start_timeout', 'start timeout reason mismatch');
+
+  const duplicatePair = await createPlayable('claw-duplicate-token');
+  const duplicatePlayer = await connect(`${WS}/play?token=${duplicatePair.issued.token}`);
+  const duplicateError = await waitFor(() => duplicatePlayer.messages.find((m) => m.type === 'error'), 'duplicate token error missing');
+  assert(['invalid_token', 'already_in_use'].includes(duplicateError.code), 'duplicate token error mismatch');
+  send(duplicatePair.kiosk, { type: 'session_event', event: 'animation_done' });
+  try { duplicatePlayer.close(); duplicatePair.player.close(); duplicatePair.kiosk.close(); } catch {}
 
   const noAckPair = await createPlayable('claw-grab-start-timeout');
   send(noAckPair.player, { type: 'input', action: 'grab' });
@@ -224,7 +235,7 @@ async function run() {
   console.log('  ✓ animation_done fallback');
 
   try { idlePlayer.close(); idleKiosk.close(); } catch {}
-  for (const pair of [...goldPairs, ...silverPairs, noSilver, noAckPair, failPair, fallbackPair]) {
+  for (const pair of [...goldPairs, ...silverPairs, noSilver, duplicatePair, noAckPair, failPair, fallbackPair]) {
     try { pair.player.close(); pair.kiosk.close(); } catch {}
   }
   console.log('\nAll integration tests passed');

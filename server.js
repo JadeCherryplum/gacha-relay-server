@@ -120,12 +120,24 @@ function issuePlayToken(kioskId) {
   return { token, expiresIn: config.tokenTtlSeconds };
 }
 
-function consumePlayToken(token) {
+function peekPlayToken(token) {
   const kioskId = tokenIndex.get(token);
   const kiosk = kioskId ? kiosks.get(kioskId) : null;
   if (!kioskId || !kiosk?.pendingToken || kiosk.pendingToken.token !== token || Date.now() >= kiosk.pendingToken.expiresAt) {
+    if (kiosk?.pendingToken?.token === token && Date.now() >= kiosk.pendingToken.expiresAt) {
+      tokenIndex.delete(token);
+      kiosk.pendingToken = null;
+    }
+    return null;
+  }
+  return kioskId;
+}
+
+function consumePlayToken(token) {
+  const kioskId = peekPlayToken(token);
+  const kiosk = kioskId ? kiosks.get(kioskId) : null;
+  if (!kioskId || !kiosk) {
     tokenIndex.delete(token);
-    if (kiosk?.pendingToken?.token === token) kiosk.pendingToken = null;
     return null;
   }
   tokenIndex.delete(token);
@@ -426,20 +438,29 @@ function handleKioskMessage(kioskId, msg) {
 }
 
 function handlePlayerConnection(ws, token) {
-  const kioskId = consumePlayToken(token);
+  const kioskId = peekPlayToken(token);
   if (!kioskId) {
+    log('player', 'invalid_token');
     send(ws, { type: 'error', code: 'invalid_token' });
     ws.close(1008, 'invalid_token');
     return;
   }
   if (!isKioskOnline(kioskId)) {
+    log('player', `kiosk_offline kioskId=${kioskId}`);
     send(ws, { type: 'error', code: 'kiosk_offline' });
     ws.close(1011, 'kiosk_offline');
     return;
   }
   if (kiosks.get(kioskId).activeSession) {
+    log('player', `already_in_use kioskId=${kioskId}`);
     send(ws, { type: 'error', code: 'already_in_use' });
     ws.close(1008, 'already_in_use');
+    return;
+  }
+  if (consumePlayToken(token) !== kioskId) {
+    log('player', `token_race kioskId=${kioskId}`);
+    send(ws, { type: 'error', code: 'invalid_token' });
+    ws.close(1008, 'invalid_token');
     return;
   }
   claimSession(kioskId, token, ws);
@@ -490,13 +511,23 @@ function resultPayload(row) {
 function adminPageData() {
   const auth = getOrCreateDailyAuthToken();
   const authUrl = auth ? `${config.publicBaseUrl}/admin/auth/${auth.token}` : null;
+  const now = isoNow();
   const slots = db.prepare('SELECT * FROM gold_slots ORDER BY start_at DESC LIMIT 20').all();
   const claims = db.prepare(`
     SELECT result, prize_id, prize_name, kiosk_id, visible_at, claimed_at
     FROM result_tokens WHERE result IN ('gold', 'silver')
+      AND (claimed_at IS NOT NULL OR expires_at > ?)
     ORDER BY created_at DESC LIMIT 30
-  `).all();
-  return { authUrl, slots, inventory: prizeInventory(localNow()), claims, now: localNow().toISO(), timezone: config.timezone };
+  `).all(now);
+  const summary = {
+    onlineKiosks: [...kiosks.values()].filter((kiosk) => kiosk.socket?.readyState === 1).length,
+    activeSessions: [...kiosks.values()].filter((kiosk) => kiosk.activeSession).length,
+    pendingClaims: db.prepare(`
+      SELECT COUNT(*) AS count FROM result_tokens
+      WHERE result IN ('gold', 'silver') AND claimed_at IS NULL AND expires_at > ?
+    `).get(now).count,
+  };
+  return { authUrl, slots, inventory: prizeInventory(localNow()), claims, summary, now: localNow().toISO(), timezone: config.timezone };
 }
 
 function claimRow(token) {
@@ -617,14 +648,20 @@ async function handleHttp(req, res) {
   if (url.pathname === '/admin/claims' && req.method === 'GET') {
     if (!getAdminSession(req)) return json(res, 401, { error: 'unauthorized' });
     const status = url.searchParams.get('status');
-    const where = status === 'claimed' ? 'AND claimed_at IS NOT NULL' : status === 'pending' ? 'AND claimed_at IS NULL' : '';
+    const now = isoNow();
+    const where = status === 'claimed'
+      ? 'AND claimed_at IS NOT NULL'
+      : status === 'pending'
+        ? 'AND claimed_at IS NULL AND expires_at > ?'
+        : 'AND (claimed_at IS NOT NULL OR expires_at > ?)';
+    const params = status === 'claimed' ? [] : [now];
     return json(res, 200, {
       claims: db.prepare(`
         SELECT result, prize_id, prize_name, kiosk_id, resolved_at, expires_at, claimed_at
         FROM result_tokens JOIN play_log USING(session_id)
         WHERE result IN ('gold', 'silver') ${where}
         ORDER BY created_at DESC
-      `).all(),
+      `).all(...params),
     });
   }
 

@@ -19,7 +19,8 @@ export const SILVER_PRIZES = [
 ];
 
 export const PRIZES = [GOLD_PRIZE, ...SILVER_PRIZES];
-const SILVER_TOTAL_UNITS = SILVER_PRIZES.reduce((sum, prize) => sum + prize.count, 0);
+const TEST_PHASE = 'test';
+const NORMAL_PHASE = 'normal';
 
 function clamp01(value) {
   return Math.max(0, Math.min(1, value));
@@ -31,8 +32,46 @@ function linearProbability(nowMs, startMs, endMs, pStart, pEnd) {
   return clamp01(pStart + (pEnd - pStart) * progress);
 }
 
+function parseLocalDate(value) {
+  return DateTime.fromISO(value, { zone: config.timezone }).startOf('day');
+}
+
+function operationPhase(nowLocal = localNow()) {
+  const date = nowLocal.startOf('day');
+  const testStart = parseLocalDate(config.testOperationStartDate);
+  const normalStart = parseLocalDate(config.normalOperationStartDate);
+  const normalEnd = parseLocalDate(config.normalOperationEndDate);
+
+  if (normalStart.isValid && normalEnd.isValid && date >= normalStart && date <= normalEnd) {
+    return { name: NORMAL_PHASE, start: normalStart, end: normalEnd };
+  }
+  if (testStart.isValid && normalStart.isValid && date >= testStart && date < normalStart) {
+    return { name: TEST_PHASE, start: testStart, end: normalStart.minus({ days: 1 }) };
+  }
+  return null;
+}
+
+function elapsedPhaseDays(phase, nowLocal) {
+  if (!phase) return 0;
+  const cappedDate = DateTime.min(nowLocal.startOf('day'), phase.end);
+  return Math.max(0, Math.floor(cappedDate.diff(phase.start, 'days').days) + 1);
+}
+
 function periodKey(prize, nowLocal) {
+  const phase = operationPhase(nowLocal);
+  if (prize.grade === 'gold') {
+    if (phase?.name === TEST_PHASE) return `gold:${TEST_PHASE}:${localDate(nowLocal)}`;
+    return `gold:${NORMAL_PHASE}`;
+  }
+  if (prize.scope === 'daily' && phase) return `${prize.grade}:${phase.name}`;
   return prize.scope === 'daily' ? localDate(nowLocal) : 'exhibition';
+}
+
+function totalUnits(prize, nowLocal) {
+  const phase = operationPhase(nowLocal);
+  if (prize.grade === 'gold' && phase?.name === TEST_PHASE) return config.testDailyGoldCount;
+  if (prize.scope === 'daily' && phase) return prize.count * elapsedPhaseDays(phase, nowLocal);
+  return prize.count;
 }
 
 export function getActiveGoldSlot(now = DateTime.utc()) {
@@ -55,24 +94,30 @@ export function getCurrentGoldP(now, slot) {
 }
 
 export function getCurrentSilverP(now = localNow()) {
+  if (!operationPhase(now)) return 0;
   const start = timeOnLocalDate(now, config.openTime);
   const end = timeOnLocalDate(now, config.closeTime);
   if (now < start || now >= end) return 0;
   return linearProbability(now.toMillis(), start.toMillis(), end.toMillis(), config.silverPStart, config.silverPEnd);
 }
 
-function awardCount(prize, nowLocal) {
-  return db.prepare('SELECT COUNT(*) AS count FROM prize_awards WHERE prize_id = ? AND period_key = ?')
-    .get(prize.id, periodKey(prize, nowLocal)).count;
+function awardCount(prize, nowLocal, nowUtc = DateTime.utc()) {
+  return db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM prize_awards a
+    LEFT JOIN result_tokens r ON r.session_id = a.session_id
+    WHERE a.prize_id = ? AND a.period_key = ?
+      AND (r.session_id IS NULL OR r.claimed_at IS NOT NULL OR r.expires_at > ?)
+  `).get(prize.id, periodKey(prize, nowLocal), nowUtc.toISO()).count;
 }
 
-function remainingUnits(prize, nowLocal) {
-  return Math.max(0, prize.count - awardCount(prize, nowLocal));
+function remainingUnits(prize, nowLocal, nowUtc = DateTime.utc()) {
+  return Math.max(0, totalUnits(prize, nowLocal) - awardCount(prize, nowLocal, nowUtc));
 }
 
 function claimPrize(prize, nowUtc, nowLocal, kioskId, sessionId) {
   const key = periodKey(prize, nowLocal);
-  if (remainingUnits(prize, nowLocal) <= 0) return null;
+  if (remainingUnits(prize, nowLocal, nowUtc) <= 0) return null;
 
   try {
     db.prepare(`
@@ -85,9 +130,9 @@ function claimPrize(prize, nowUtc, nowLocal, kioskId, sessionId) {
   }
 }
 
-function chooseWeightedPrize(prizes, nowLocal, roll) {
+function chooseWeightedPrize(prizes, nowLocal, roll, nowUtc = DateTime.utc()) {
   const weighted = prizes
-    .map((prize) => ({ prize, remaining: remainingUnits(prize, nowLocal) }))
+    .map((prize) => ({ prize, remaining: remainingUnits(prize, nowLocal, nowUtc) }))
     .filter((entry) => entry.remaining > 0);
   const total = weighted.reduce((sum, entry) => sum + entry.remaining, 0);
   if (total <= 0) return null;
@@ -109,8 +154,14 @@ const resolveTransaction = db.transaction(({ kioskId, sessionId, goldRoll, silve
     return consumeForced(config.testForcedResult, nowUtc, nowLocal, kioskId, sessionId, silverPrizeRoll);
   }
 
-  const gold = getActiveGoldSlot(nowUtc);
-  if (gold && remainingUnits(GOLD_PRIZE, nowLocal) > 0 && goldRoll < getCurrentGoldP(nowUtc, gold)) {
+  const phase = operationPhase(nowLocal);
+  if (phase?.name === TEST_PHASE && config.testDailyGoldCount > 0 && goldRoll < clamp01(config.testGoldP)) {
+    const award = claimPrize(GOLD_PRIZE, nowUtc, nowLocal, kioskId, sessionId);
+    if (award) return award;
+  }
+
+  const gold = phase?.name === NORMAL_PHASE ? getActiveGoldSlot(nowUtc) : null;
+  if (gold && remainingUnits(GOLD_PRIZE, nowLocal, nowUtc) > 0 && goldRoll < getCurrentGoldP(nowUtc, gold)) {
     const changed = db.prepare(`
       UPDATE gold_slots
       SET consumed_at = ?, kiosk_id = ?, session_id = ?
@@ -125,7 +176,7 @@ const resolveTransaction = db.transaction(({ kioskId, sessionId, goldRoll, silve
   const silverP = getCurrentSilverP(nowLocal);
   if (silverP <= 0 || silverRoll >= silverP) return { result: 'fail' };
 
-  const silver = chooseWeightedPrize(SILVER_PRIZES, nowLocal, silverPrizeRoll);
+  const silver = chooseWeightedPrize(SILVER_PRIZES, nowLocal, silverPrizeRoll, nowUtc);
   if (!silver) return { result: 'fail' };
 
   return claimPrize(silver, nowUtc, nowLocal, kioskId, sessionId) ?? { result: 'fail' };
@@ -134,8 +185,12 @@ const resolveTransaction = db.transaction(({ kioskId, sessionId, goldRoll, silve
 function consumeForced(result, nowUtc, nowLocal, kioskId, sessionId, silverPrizeRoll) {
   const timestamp = nowUtc.toISO();
   if (result === 'gold') {
+    const phase = operationPhase(nowLocal);
+    if (phase?.name === TEST_PHASE) {
+      return claimPrize(GOLD_PRIZE, nowUtc, nowLocal, kioskId, sessionId) ?? { result: 'fail' };
+    }
     const gold = getActiveGoldSlot(nowUtc);
-    if (!gold || remainingUnits(GOLD_PRIZE, nowLocal) <= 0) return { result: 'fail' };
+    if (!gold || remainingUnits(GOLD_PRIZE, nowLocal, nowUtc) <= 0) return { result: 'fail' };
     const changed = db.prepare(`
       UPDATE gold_slots SET consumed_at = ?, kiosk_id = ?, session_id = ?
       WHERE id = ? AND consumed_at IS NULL
@@ -144,7 +199,7 @@ function consumeForced(result, nowUtc, nowLocal, kioskId, sessionId, silverPrize
     return claimPrize(GOLD_PRIZE, nowUtc, nowLocal, kioskId, sessionId) ?? { result: 'fail' };
   }
   if (result === 'silver') {
-    const silver = chooseWeightedPrize(SILVER_PRIZES, nowLocal, silverPrizeRoll);
+    const silver = chooseWeightedPrize(SILVER_PRIZES, nowLocal, silverPrizeRoll, nowUtc);
     if (!silver) return { result: 'fail' };
     return claimPrize(silver, nowUtc, nowLocal, kioskId, sessionId) ?? { result: 'fail' };
   }
@@ -152,20 +207,20 @@ function consumeForced(result, nowUtc, nowLocal, kioskId, sessionId, silverPrize
 }
 
 export function prizeInventory(nowLocal = localNow()) {
-  const goldAwarded = db.prepare('SELECT COUNT(*) AS count FROM prize_awards WHERE prize_id = ? AND period_key = ?')
-    .get(GOLD_PRIZE.id, 'exhibition').count;
+  const nowUtc = DateTime.utc();
   return PRIZES.map((prize) => {
     const key = periodKey(prize, nowLocal);
-    const awarded = prize.id === GOLD_PRIZE.id ? goldAwarded : awardCount(prize, nowLocal);
+    const awarded = awardCount(prize, nowLocal, nowUtc);
+    const total = totalUnits(prize, nowLocal);
     return {
       id: prize.id,
       name: prize.name,
       grade: prize.grade,
       scope: prize.scope,
       periodKey: key,
-      total: prize.count,
+      total,
       awarded,
-      remaining: Math.max(0, prize.count - awarded),
+      remaining: Math.max(0, total - awarded),
     };
   });
 }
