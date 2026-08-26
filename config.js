@@ -19,6 +19,7 @@ export const config = {
   heartbeatIntervalMs: intEnv('HEARTBEAT_INTERVAL_MS', 15000),
   rateLimitPerSec: intEnv('RATE_LIMIT_PER_SEC', 30),
   startTimeoutMs: intEnv('START_TIMEOUT_MS', 30000),
+  grabStartedTimeoutMs: intEnv('GRAB_STARTED_TIMEOUT_MS', 3000),
   grabResolvedTimeoutMs: intEnv('GRAB_RESOLVED_TIMEOUT_MS', 10000),
   animationDoneTimeoutMs: intEnv('ANIMATION_DONE_TIMEOUT_MS', 30000),
   timezone: process.env.TIMEZONE ?? 'Asia/Seoul',

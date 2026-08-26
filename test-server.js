@@ -27,6 +27,7 @@ const server = spawn(process.execPath, ['server.js'], {
     CLOSE_TIME: '23:59',
     SILVER_P_START: '1',
     SILVER_P_END: '1',
+    GRAB_STARTED_TIMEOUT_MS: '500',
     GRAB_RESOLVED_TIMEOUT_MS: '500',
     ANIMATION_DONE_TIMEOUT_MS: '500',
     START_TIMEOUT_MS: '150',
@@ -120,6 +121,10 @@ async function createPlayable(kioskId) {
 async function completeGrab(pair, { grabbed = true, reveal = true, done = true } = {}) {
   send(pair.player, { type: 'input', action: 'grab' });
   await waitFor(() => pair.kiosk.messages.find((m) => m.type === 'player_input' && m.action === 'grab'), 'grab relay missing');
+  await wait(50);
+  assert(!pair.player.messages.find((m) => m.type === 'resolving'), 'resolving should wait for grab_started');
+  send(pair.kiosk, { type: 'session_event', event: 'grab_started' });
+  await waitFor(() => pair.player.messages.find((m) => m.type === 'resolving'), 'resolving missing after grab_started');
   send(pair.kiosk, { type: 'session_event', event: 'grab_resolved', grabbed });
   const result = await waitFor(() => pair.kiosk.messages.find((m) => m.type === 'grab_result'), 'grab_result missing');
   if (reveal) send(pair.kiosk, { type: 'session_event', event: 'result_visible' });
@@ -195,6 +200,14 @@ async function run() {
   const idleEnded = await waitFor(() => idlePlayer.messages.find((m) => m.type === 'session_ended'), 'start timeout missing');
   assert(idleEnded.reason === 'start_timeout', 'start timeout reason mismatch');
 
+  const noAckPair = await createPlayable('claw-grab-start-timeout');
+  send(noAckPair.player, { type: 'input', action: 'grab' });
+  await waitFor(() => noAckPair.kiosk.messages.find((m) => m.type === 'player_input' && m.action === 'grab'), 'grab relay missing for no ack');
+  await wait(50);
+  assert(!noAckPair.player.messages.find((m) => m.type === 'resolving'), 'no ack should not enter resolving');
+  const noAckError = await waitFor(() => noAckPair.player.messages.find((m) => m.type === 'error'), 'grab_started_timeout error missing');
+  assert(noAckError.code === 'grab_started_timeout', 'grab_started_timeout code mismatch');
+
   const failPair = await createPlayable('claw-fail');
   const failServerResult = await completeGrab(failPair, { grabbed: false });
   assert(failServerResult.result === 'fail' && failServerResult.artifactIndex == null && !failServerResult.prizeId, 'physical fail result mismatch');
@@ -211,7 +224,7 @@ async function run() {
   console.log('  ✓ animation_done fallback');
 
   try { idlePlayer.close(); idleKiosk.close(); } catch {}
-  for (const pair of [...goldPairs, ...silverPairs, noSilver, failPair, fallbackPair]) {
+  for (const pair of [...goldPairs, ...silverPairs, noSilver, noAckPair, failPair, fallbackPair]) {
     try { pair.player.close(); pair.kiosk.close(); } catch {}
   }
   console.log('\nAll integration tests passed');

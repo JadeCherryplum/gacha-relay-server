@@ -281,11 +281,25 @@ function handleGrab(kioskId) {
   const session = kiosk?.activeSession;
   if (!session || session.state !== 'playing') return;
 
-  session.state = 'waiting_grab_resolved';
+  session.state = 'waiting_grab_started';
   clearTimeout(session.sessionTimer);
   clearInterval(session.tickInterval);
   db.prepare('UPDATE play_log SET grabbed_at = ? WHERE session_id = ?').run(isoNow(), session.sessionId);
   send(kiosk.socket, { type: 'player_input', action: 'grab' });
+
+  session.phaseTimer = setTimeout(() => {
+    send(session.playerSocket, { type: 'error', code: 'grab_started_timeout' });
+    endSession(kioskId, 'error', 'grab_started_timeout');
+  }, config.grabStartedTimeoutMs);
+}
+
+function handleGrabStarted(kioskId) {
+  const kiosk = kiosks.get(kioskId);
+  const session = kiosk?.activeSession;
+  if (!session || session.state !== 'waiting_grab_started') return;
+  clearTimeout(session.phaseTimer);
+
+  session.state = 'waiting_grab_resolved';
   send(session.playerSocket, { type: 'resolving' });
 
   session.phaseTimer = setTimeout(() => {
@@ -405,6 +419,7 @@ function handleKioskMessage(kioskId, msg) {
     return;
   }
   if (msg.type !== 'session_event') return;
+  if (msg.event === 'grab_started') handleGrabStarted(kioskId);
   if (msg.event === 'grab_resolved') handleGrabResolved(kioskId, msg);
   if (msg.event === 'result_visible') handleResultVisible(kioskId);
   if (msg.event === 'animation_done') handleAnimationDone(kioskId);
