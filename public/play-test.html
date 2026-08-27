@@ -13,6 +13,9 @@
     button{width:100%;margin:5px 0;padding:12px 14px;border:0;border-radius:12px;background:#f1c27a;color:#26180f;font-weight:800;cursor:pointer}
     button:hover{filter:brightness(1.08)}
     button.active{background:#fff2c5}
+    .group-title{margin:16px 0 8px;font-size:12px;font-weight:800;color:#fff2c5;letter-spacing:.04em}
+    .relic-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+    .relic-grid button{margin:0;padding:9px 0;border-radius:10px;font-size:12px}
     .stage{display:flex;align-items:flex-start;justify-content:center;min-width:0}
     .phone{width:min(420px,100%);aspect-ratio:970/2158;border:10px solid #0d0b09;border-radius:28px;overflow:hidden;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.55)}
     iframe{display:block;width:100%;height:100%;border:0;background:#000}
@@ -30,18 +33,35 @@
     <button data-preview="artifact">비당첨 유물</button>
     <button data-preview="silver">은 당첨</button>
     <button data-preview="gold">금 당첨</button>
+    <div class="group-title">유물 이미지 확인</div>
+    <div id="relicButtons" class="relic-grid"></div>
   </aside>
   <main class="stage">
     <div class="phone"><iframe id="previewFrame" src="/play?preview=start" title="mobile preview"></iframe></div>
   </main>
   <script>
     const frame=document.querySelector('#previewFrame');
+    const setActive=(button)=>{
+      document.querySelectorAll('button[data-preview],button[data-artifact-index]').forEach(x=>x.classList.toggle('active',x===button));
+    };
     document.querySelectorAll('button[data-preview]').forEach(button=>{
       button.addEventListener('click',()=>{
-        document.querySelectorAll('button[data-preview]').forEach(x=>x.classList.toggle('active',x===button));
+        setActive(button);
         frame.src=`/play?preview=${encodeURIComponent(button.dataset.preview)}`;
       });
     });
+    const relicButtons=document.querySelector('#relicButtons');
+    for(let i=0;i<19;i+=1){
+      const button=document.createElement('button');
+      button.type='button';
+      button.dataset.artifactIndex=String(i);
+      button.textContent=String(i+1).padStart(2,'0');
+      button.addEventListener('click',()=>{
+        setActive(button);
+        frame.src=`/play?preview=artifact&artifactIndex=${i}`;
+      });
+      relicButtons.appendChild(button);
+    }
   </script>
 </body>
 </html>

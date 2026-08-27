@@ -129,6 +129,7 @@
     const playToken=params.get('token');
     const resultToken=params.get('result');
     const preview=params.get('preview');
+    const previewArtifactIndex=Number(params.get('artifactIndex')??0);
     const screens=['start','playing','resolving','finished','notice'];
     const show=id=>screens.forEach(x=>document.getElementById(x).classList.toggle('hidden',x!==id));
     const notice=(title,message)=>{document.querySelector('#noticeTitle').textContent=title;document.querySelector('#noticeMessage').textContent=message;show('notice')};
@@ -145,7 +146,6 @@
       gyeyangbae:3,
       handkerchief:4,
       ceramic_lunchbox:5,
-      lucy_doll:6,
       gold_crystal_led_tower:7
     };
 
@@ -265,7 +265,7 @@
         prizeName:'USB',
         claimUrl:'https://gacha.cherryplum.net/claim/preview-silver'
       });
-      return showResult({result:'fail',artifactIndex:0});
+      return showResult({result:'fail',artifactIndex:Number.isFinite(previewArtifactIndex)?previewArtifactIndex:0});
     }
     function connect(){
       const scheme=location.protocol==='https:'?'wss:':'ws:';
