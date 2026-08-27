@@ -188,6 +188,14 @@
       if(!Number.isFinite(n))return '/gui/relic/01.png';
       return `/gui/relic/${String(n+1).padStart(2,'0')}.png`;
     }
+    function loadImage(img,src,alt){
+      return new Promise(resolve=>{
+        img.onload=()=>resolve(true);
+        img.onerror=()=>resolve(false);
+        img.src=src;
+        img.alt=alt||'';
+      });
+    }
     function isPrize(data){return Boolean(data?.claimUrl)&&(data.result==='gold'||data.result==='silver')}
     function prizeSequenceIndex(data){
       if(prizeSequenceById[data?.prizeId])return prizeSequenceById[data.prizeId];
@@ -196,7 +204,6 @@
     async function showResult(data){
       finished=true;
       disable();
-      show('finished');
       const artifactPanel=document.querySelector('#artifactResult');
       const prizePanel=document.querySelector('#prizeResult');
       const prize=isPrize(data);
@@ -209,25 +216,32 @@
         prizeCharacter.src=`/gui/sequence/${index}.webp`;
         prizeCharacter.classList.toggle('gold',data.result==='gold');
         document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
+        show('finished');
         return;
       }
 
-      const artifact=await artifactByIndex(data.artifactIndex);
-      const hasArtifact=Boolean(artifact);
       const frame=document.querySelector('#relicFrame');
       const img=document.querySelector('#relicImage');
       const title=document.querySelector('#resultTitle');
       const message=document.querySelector('#resultMessage');
+      frame.className='relic-frame empty';
+      img.removeAttribute('src');
+      img.alt='';
+      title.textContent='결과 확인 중';
+      message.textContent='';
+
+      const artifact=await artifactByIndex(data.artifactIndex);
+      const hasArtifact=Boolean(artifact);
       frame.className=`relic-frame ${hasArtifact?'normal':'empty'}`;
       if(hasArtifact){
-        img.src=relicImageUrl(data.artifactIndex);
-        img.alt=artifact.name;
+        await loadImage(img,relicImageUrl(data.artifactIndex),artifact.name);
       }else{
         img.removeAttribute('src');
         img.alt='';
       }
       title.textContent=artifact?.name || '아쉽지만 실패했습니다';
       message.textContent=artifact?.description || '다음 기회에 다시 도전해 주세요.';
+      show('finished');
     }
     async function recover(urlToken){
       show('resolving');
