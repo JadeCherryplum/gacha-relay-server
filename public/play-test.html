@@ -17,7 +17,7 @@
     .relic-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
     .relic-grid button{margin:0;padding:9px 0;border-radius:10px;font-size:12px}
     .stage{display:flex;align-items:flex-start;justify-content:center;min-width:0}
-    .phone{width:min(420px,100%);aspect-ratio:970/2158;border:10px solid #0d0b09;border-radius:28px;overflow:hidden;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+    .phone{width:min(390px,100%);aspect-ratio:390/844;border:10px solid #0d0b09;border-radius:28px;overflow:hidden;background:#000;box-shadow:0 24px 80px rgba(0,0,0,.55)}
     iframe{display:block;width:100%;height:100%;border:0;background:#000}
     code{font-family:ui-monospace,Consolas,monospace;color:#fff2c5}
     @media (max-width:760px){body{grid-template-columns:1fr;padding:14px}aside{position:relative;top:0}.stage{align-items:center}.phone{width:min(390px,100%)}}
@@ -26,7 +26,7 @@
 <body>
   <aside>
     <h1>모바일 화면 미리보기</h1>
-    <p>실제 서버 당첨 없이 각 화면을 확인하는 테스트 페이지입니다. iframe은 <code>/play?preview=...</code>를 사용합니다.</p>
+    <p>실제 서버 당첨 없이 각 화면을 확인하는 테스트 페이지입니다. iframe은 일반 휴대폰 크기인 <code>390x844</code> 기준이며 <code>/play?preview=...</code>를 사용합니다.</p>
     <button data-preview="start" class="active">타이틀</button>
     <button data-preview="playing">컨트롤러</button>
     <button data-preview="resolving">결과 대기</button>

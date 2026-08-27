@@ -54,6 +54,7 @@
     .description{width:94%;max-height:34%;overflow:auto;margin:0 auto;color:#f2dfbd;font-family:ChosunGsHanja,GapyeongHanseokL,serif;font-size:clamp(12px,3.25vw,17px);line-height:1.58;word-break:keep-all;text-shadow:0 1px 3px rgba(0,0,0,.4)}
 
     .prize-stage{position:fixed;inset:0;overflow:hidden;background:transparent}
+    .prize-layout{position:absolute;left:50%;top:50%;width:max(100vw,calc(100dvh * 970 / 2158));height:max(100dvh,calc(100vw * 2158 / 970));transform:translate(-50%,-50%);overflow:hidden}
     .prize-result{z-index:1;object-fit:cover}
     .prize-character{position:absolute;left:50%;bottom:4.4%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
     .prize-character.gold{bottom:6.2%}
@@ -108,10 +109,12 @@
       </div>
       <div id="prizeResult" class="prize-stage hidden">
         <img class="fill-img prize-confetti" src="/gui/sequence/confetti.webp" alt="">
-        <img class="fill-img prize-result" src="/gui/Result.png" alt="">
-        <img id="prizeCharacter" class="prize-character" src="/gui/sequence/1.webp" alt="">
-        <img id="claimQr" class="claim-qr" alt="상품 수령 QR">
-        <div id="claimPrizeName" class="claim-prize-name"></div>
+        <div class="prize-layout">
+          <img class="fill-img prize-result" src="/gui/Result.png" alt="">
+          <img id="prizeCharacter" class="prize-character" src="/gui/sequence/1.webp" alt="">
+          <img id="claimQr" class="claim-qr" alt="상품 수령 QR">
+          <div id="claimPrizeName" class="claim-prize-name"></div>
+        </div>
       </div>
     </div>
   </section>
