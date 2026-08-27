@@ -148,6 +148,8 @@ async function run() {
   const previewPage = await fetch(`${BASE}/play-test`);
   const previewHtml = await previewPage.text();
   assert(previewPage.ok && previewHtml.includes('/play?preview=start') && previewHtml.includes('relicButtons'), 'mobile preview page failed');
+  const previewFilePage = await fetch(`${BASE}/play-test.html`);
+  assert(previewFilePage.ok && (await previewFilePage.text()).includes('relicButtons'), 'mobile preview file route failed');
   const previewMode = await fetch(`${BASE}/play?preview=gold`);
   assert(previewMode.ok && (await previewMode.text()).includes('const preview'), 'mobile preview mode failed');
   const timerFont = await fetch(`${BASE}/gui/Font/GapyeongHanseokbongB.otf`);
