@@ -140,6 +140,11 @@
     const startButton=document.querySelector('#startButton');
     const held=new Map();
     let ws=null,resultUrl=null,finished=false,artifactData=null,bound=false,started=false,startDeadlineTimer=null;
+    const soundUrls={
+      start:'/gui/sound/Start.wav',
+      arrow:'/gui/sound/Arrow.wav',
+      grab:'/gui/sound/Grab.wav'
+    };
 
     const prizeSequenceById={
       usb:1,
@@ -153,6 +158,12 @@
     function stop(action){const x=held.get(action);if(!x)return;clearInterval(x.timer);x.button.classList.remove('pressed');held.delete(action);send(action,'stop')}
     function stopAll(){[...held.keys()].forEach(stop)}
     function send(action,phase){if(ws?.readyState===1)ws.send(JSON.stringify(phase?{type:'input',action,phase}:{type:'input',action}))}
+    function playSound(name){
+      const url=soundUrls[name];
+      if(!url)return;
+      const audio=new Audio(url);
+      audio.play().catch(()=>{});
+    }
     function setControlsDisabled(disabled){buttons.forEach(b=>b.disabled=disabled);grab.disabled=disabled}
     function disable(){stopAll();setControlsDisabled(true)}
     function clearStartDeadline(){if(startDeadlineTimer){clearTimeout(startDeadlineTimer);startDeadlineTimer=null}}
@@ -164,6 +175,7 @@
         const start=e=>{
           e.preventDefault();
           if(held.has(a)||b.disabled)return;
+          playSound('arrow');
           b.classList.add('pressed');
           send(a,'start');
           held.set(a,{button:b,timer:setInterval(()=>send(a,'hold'),HOLD_MS)});
@@ -171,7 +183,7 @@
         ['pointerdown','touchstart'].forEach(ev=>b.addEventListener(ev,start,{passive:false}));
         ['pointerup','pointercancel','pointerleave','touchend','touchcancel'].forEach(ev=>b.addEventListener(ev,()=>stop(a),{passive:false}));
       });
-      grab.addEventListener('click',()=>{if(grab.disabled)return;disable();send('grab')});
+      grab.addEventListener('click',()=>{if(grab.disabled)return;playSound('grab');disable();send('grab')});
     }
     async function artifactByIndex(index){
       if(index===null||index===undefined)return null;
@@ -329,7 +341,7 @@
     startButton.disabled=true;
     show('notice');
     connect();
-    startButton.addEventListener('click',()=>{if(started||ws?.readyState!==1)return;started=true;startButton.disabled=true;ws.send(JSON.stringify({type:'start'}))});
+    startButton.addEventListener('click',()=>{if(started||ws?.readyState!==1)return;playSound('start');started=true;startButton.disabled=true;ws.send(JSON.stringify({type:'start'}))});
   })();
   </script>
 </body>
