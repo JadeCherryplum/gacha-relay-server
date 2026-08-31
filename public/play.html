@@ -56,10 +56,13 @@
     .prize-stage{position:fixed;inset:0;overflow:hidden;background:transparent}
     .prize-layout{position:absolute;left:50%;top:50%;width:max(100vw,calc(100dvh * 970 / 2158));height:max(100dvh,calc(100vw * 2158 / 970));transform:translate(-50%,-50%);overflow:hidden}
     .prize-result{z-index:1;object-fit:cover}
-    .prize-character{position:absolute;left:50%;bottom:4.4%;width:61%;max-height:45%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
-    .prize-character.gold{bottom:6.2%}
+    .prize-character{position:absolute;left:50%;bottom:4.2%;width:31%;max-height:29%;object-fit:contain;transform:translateX(-50%);z-index:3;pointer-events:none}
+    .prize-character.gold{bottom:4.2%}
     .prize-confetti{inset:auto;left:50%;top:50%;width:120vw;height:120dvh;transform:translate(-50%,-50%);object-fit:cover;z-index:4;pointer-events:none}
-    .claim-qr{position:absolute;left:18.4%;top:21.5%;width:18.8%;aspect-ratio:1;z-index:5;background:#fff;padding:.8%;box-shadow:0 4px 10px rgba(0,0,0,.26)}
+    .claim-qr{position:absolute;left:28.4%;top:31.3%;width:43.2%;aspect-ratio:1;z-index:5;background:#fff;padding:1.5%;border-radius:6.5%;box-shadow:0 4px 10px rgba(0,0,0,.26)}
+    .claim-download{position:absolute;left:20.1%;top:65.7%;width:59.8%;z-index:5;display:block}
+    .claim-download img{display:block;width:100%;height:auto;pointer-events:none}
+    .claim-download:active{transform:scale(.96)}
     .claim-prize-name{display:none}
 
     .notice-panel{margin:auto;width:86%;padding:28px 22px;border-radius:22px;background:rgba(33,15,9,.82);border:1px solid rgba(255,225,170,.28);text-align:center;box-shadow:0 18px 40px rgba(0,0,0,.35)}
@@ -67,7 +70,6 @@
     .notice-panel p{margin:0;color:#ead1a7;line-height:1.6}
     .spinner{width:54px;height:54px;border:5px solid rgba(255,234,190,.25);border-top-color:#f7d378;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 22px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @media (max-height:720px){.claim-qr{width:17%;top:21.8%}}
   </style>
 </head>
 <body>
@@ -113,6 +115,7 @@
           <img class="fill-img prize-result" src="/gui/Result.png" alt="">
           <img id="prizeCharacter" class="prize-character" src="/gui/sequence/1.webp" alt="">
           <img id="claimQr" class="claim-qr" alt="상품 수령 QR">
+          <a id="claimQrDownload" class="claim-download" download="prize-qr.png" aria-label="QR 다운로드"><img src="/gui/Btn_qr.png" alt="QR 다운로드"></a>
           <div id="claimPrizeName" class="claim-prize-name"></div>
         </div>
       </div>
@@ -227,7 +230,9 @@
         const prizeCharacter=document.querySelector('#prizeCharacter');
         prizeCharacter.src=`/gui/sequence/${index}.webp`;
         prizeCharacter.classList.toggle('gold',data.result==='gold');
-        document.querySelector('#claimQr').src=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
+        const qrUrl=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
+        document.querySelector('#claimQr').src=qrUrl;
+        document.querySelector('#claimQrDownload').href=qrUrl;
         show('finished');
         return;
       }
