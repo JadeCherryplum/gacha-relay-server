@@ -115,7 +115,7 @@
           <img class="fill-img prize-result" src="/gui/Result.png" alt="">
           <img id="prizeCharacter" class="prize-character" src="/gui/sequence/1.webp" alt="">
           <img id="claimQr" class="claim-qr" alt="상품 수령 QR">
-          <a id="claimQrDownload" class="claim-download" download="prize-qr.png" aria-label="QR 다운로드"><img src="/gui/Btn_qr.png" alt="QR 다운로드"></a>
+          <a id="claimQrDownload" class="claim-download" href="#" download="prize-page.png" aria-label="당첨 화면 다운로드"><img src="/gui/Btn_qr.png" alt="당첨 화면 다운로드"></a>
           <div id="claimPrizeName" class="claim-prize-name"></div>
         </div>
       </div>
@@ -216,6 +216,111 @@
       if(prizeSequenceById[data?.prizeId])return prizeSequenceById[data.prizeId];
       return data?.result==='gold'?7:1;
     }
+    function imageReady(img){
+      if(!img?.src)return Promise.resolve(false);
+      if(img.complete&&img.naturalWidth)return img.decode?img.decode().catch(()=>{}).then(()=>true):Promise.resolve(true);
+      return new Promise(resolve=>{
+        img.onload=()=>resolve(true);
+        img.onerror=()=>resolve(false);
+      });
+    }
+    function drawImageFit(ctx,img,rect,fit){
+      if(!img?.naturalWidth||!img?.naturalHeight||!rect.width||!rect.height)return;
+      const sw=img.naturalWidth,sh=img.naturalHeight;
+      const scale=fit==='cover'?Math.max(rect.width/sw,rect.height/sh):Math.min(rect.width/sw,rect.height/sh);
+      const dw=sw*scale,dh=sh*scale;
+      ctx.drawImage(img,rect.x+(rect.width-dw)/2,rect.y+(rect.height-dh)/2,dw,dh);
+    }
+    function roundedRect(ctx,x,y,w,h,r){
+      const radius=Math.min(r,w/2,h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+radius,y);
+      ctx.arcTo(x+w,y,x+w,y+h,radius);
+      ctx.arcTo(x+w,y+h,x,y+h,radius);
+      ctx.arcTo(x,y+h,x,y,radius);
+      ctx.arcTo(x,y,x+w,y,radius);
+      ctx.closePath();
+    }
+    function buildPrizeScreenshotDataUrl(){
+      const prizePanel=document.querySelector('#prizeResult');
+      if(prizePanel.classList.contains('hidden'))return '';
+      const dpr=Math.min(window.devicePixelRatio||1,3);
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.round(window.innerWidth*dpr);
+      canvas.height=Math.round(window.innerHeight*dpr);
+      const ctx=canvas.getContext('2d');
+      ctx.scale(dpr,dpr);
+      ctx.fillStyle=getComputedStyle(document.body).backgroundColor||'#2a130d';
+      ctx.fillRect(0,0,window.innerWidth,window.innerHeight);
+
+      const confetti=document.querySelector('.prize-confetti');
+      drawImageFit(ctx,confetti,confetti.getBoundingClientRect(),'cover');
+      const result=document.querySelector('.prize-result');
+      drawImageFit(ctx,result,result.getBoundingClientRect(),'cover');
+
+      const qr=document.querySelector('#claimQr');
+      const qrRect=qr.getBoundingClientRect();
+      const qrStyle=getComputedStyle(qr);
+      const pad=parseFloat(qrStyle.paddingLeft)||0;
+      const radius=parseFloat(qrStyle.borderRadius)||0;
+      ctx.save();
+      ctx.shadowColor='rgba(0,0,0,.26)';
+      ctx.shadowBlur=10;
+      ctx.shadowOffsetY=4;
+      roundedRect(ctx,qrRect.x,qrRect.y,qrRect.width,qrRect.height,radius);
+      ctx.fillStyle='#fff';
+      ctx.fill();
+      ctx.restore();
+      drawImageFit(ctx,qr,{x:qrRect.x+pad,y:qrRect.y+pad,width:qrRect.width-pad*2,height:qrRect.height-pad*2},'contain');
+
+      const character=document.querySelector('#prizeCharacter');
+      drawImageFit(ctx,character,character.getBoundingClientRect(),'contain');
+      const button=document.querySelector('#claimQrDownload img');
+      drawImageFit(ctx,button,button.getBoundingClientRect(),'contain');
+      return canvas.toDataURL('image/png');
+    }
+    function triggerPrizeScreenshotDownload(){
+      const dataUrl=buildPrizeScreenshotDataUrl();
+      if(!dataUrl)return;
+      const link=document.createElement('a');
+      link.href=pngDataUrlToBlobUrl(dataUrl);
+      link.download='prize-page.png';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+      link.remove();
+    }
+    function pngDataUrlToBlobUrl(dataUrl){
+      const base64=dataUrl.split(',')[1]||'';
+      const bytes=new Uint8Array(atob(base64).split('').map(char=>char.charCodeAt(0)));
+      return URL.createObjectURL(new Blob([bytes],{type:'image/png'}));
+    }
+    function downloadPrizeScreenshot(event){
+      const target=event.currentTarget;
+      const prizePanel=document.querySelector('#prizeResult');
+      if(prizePanel.classList.contains('hidden')){
+        event.preventDefault();
+        return;
+      }
+      const pending=[...prizePanel.querySelectorAll('img')].filter(img=>!img.complete||!img.naturalWidth);
+      if(pending.length){
+        event.preventDefault();
+        Promise.all(pending.map(imageReady)).then(triggerPrizeScreenshotDownload);
+        return;
+      }
+      const dataUrl=buildPrizeScreenshotDataUrl();
+      if(!dataUrl){
+        event.preventDefault();
+        return;
+      }
+      const url=pngDataUrlToBlobUrl(dataUrl);
+      target.href=url;
+      target.download='prize-page.png';
+      setTimeout(()=>{
+        target.href='#';
+        URL.revokeObjectURL(url);
+      },1000);
+    }
     async function showResult(data){
       finished=true;
       disable();
@@ -232,7 +337,6 @@
         prizeCharacter.classList.toggle('gold',data.result==='gold');
         const qrUrl=`/qr?text=${encodeURIComponent(data.claimUrl)}`;
         document.querySelector('#claimQr').src=qrUrl;
-        document.querySelector('#claimQrDownload').href=qrUrl;
         show('finished');
         return;
       }
@@ -340,6 +444,7 @@
       };
     }
     setControlsDisabled(true);
+    document.querySelector('#claimQrDownload').addEventListener('click',downloadPrizeScreenshot);
     if(preview){showPreview(preview);return}
     if(resultToken&&!playToken){recover(resultToken);return}
     if(!playToken){notice('잘못된 접속','키오스크의 QR 코드를 다시 스캔해 주세요.');return}

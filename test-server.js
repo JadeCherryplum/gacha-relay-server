@@ -146,6 +146,7 @@ async function run() {
   const page = await fetch(`${BASE}/play`);
   const playHtml = await page.text();
   assert(page.ok && playHtml.includes('결과 확인 중') && playHtml.includes('/gui/sound/Start.wav'), 'mobile page failed');
+  assert(playHtml.includes('downloadPrizeScreenshot') && playHtml.includes('prize-page.png'), 'prize screenshot download missing');
   const previewPage = await fetch(`${BASE}/play-test`);
   const previewHtml = await previewPage.text();
   assert(previewPage.ok && previewHtml.includes('/play?preview=start') && previewHtml.includes('relicButtons'), 'mobile preview page failed');
