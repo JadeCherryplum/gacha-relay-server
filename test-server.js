@@ -118,7 +118,8 @@ async function createPlayable(kioskId) {
   await wait(30);
   send(kiosk, { type: 'request_token' });
   const issued = await waitFor(() => kiosk.messages.find((m) => m.type === 'token_issued'), `${kioskId} token missing`);
-  const player = await connect(`${WS}/play?token=${issued.token}`);
+  assert(new URL(issued.playUrl).pathname === `/p/${issued.token}`, 'play QR URL should use short path');
+  const player = await connect(`${WS}/p/${issued.token}`);
   await waitFor(() => player.messages.find((m) => m.type === 'claimed'), `${kioskId} claimed missing`);
   await waitFor(() => kiosk.messages.find((m) => m.type === 'player_claimed'), `${kioskId} player_claimed missing`);
   send(player, { type: 'start' });
@@ -164,7 +165,7 @@ async function run() {
   await seedGold(cookie, 2);
   const admin = await fetch(`${BASE}/admin`, { headers: { Cookie: cookie } });
   const adminHtml = await admin.text();
-  assert(admin.ok && adminHtml.includes('상품별 재고 현황') && adminHtml.includes('운영 상태'), 'admin inventory failed');
+  assert(admin.ok && adminHtml.includes('상품별 재고 현황') && adminHtml.includes('운영 상태') && adminHtml.includes('/a/'), 'admin inventory failed');
   console.log('  ✓ admin and artifact data');
 
   console.log('\n=== test daily gold and claim ===');
@@ -177,6 +178,8 @@ async function run() {
   assert(goldResults.every((m) => m.prizeId === 'gold_crystal_led_tower' && m.prizeName), 'gold prize payload missing');
   const goldMobile = await waitFor(() => goldPairs[0].player.messages.find((m) => m.type === 'result'), 'gold mobile result missing');
   assert(goldMobile.result === 'gold' && goldMobile.claimUrl && goldMobile.prizeName, 'gold mobile payload missing');
+  assert(new URL(goldPairs[0].started.resultUrl).pathname.startsWith('/r/'), 'result URL should use short path');
+  assert(new URL(goldMobile.claimUrl).pathname.startsWith('/c/'), 'claim QR URL should use short path');
   const claimPath = new URL(goldMobile.claimUrl).pathname;
   assert((await fetch(`${BASE}${claimPath}`)).status === 401, 'claim auth guard failed');
   const claimPage = await fetch(`${BASE}${claimPath}`, { headers: { Cookie: cookie } });
@@ -208,13 +211,13 @@ async function run() {
   await wait(30);
   send(idleKiosk, { type: 'request_token' });
   const idleIssued = await waitFor(() => idleKiosk.messages.find((m) => m.type === 'token_issued'), 'idle token missing');
-  const idlePlayer = await connect(`${WS}/play?token=${idleIssued.token}`);
+  const idlePlayer = await connect(`${WS}/p/${idleIssued.token}`);
   await waitFor(() => idlePlayer.messages.find((m) => m.type === 'claimed'), 'idle claimed missing');
   const idleEnded = await waitFor(() => idlePlayer.messages.find((m) => m.type === 'session_ended'), 'start timeout missing');
   assert(idleEnded.reason === 'start_timeout', 'start timeout reason mismatch');
 
   const duplicatePair = await createPlayable('claw-duplicate-token');
-  const duplicatePlayer = await connect(`${WS}/play?token=${duplicatePair.issued.token}`);
+  const duplicatePlayer = await connect(`${WS}/p/${duplicatePair.issued.token}`);
   const duplicateError = await waitFor(() => duplicatePlayer.messages.find((m) => m.type === 'error'), 'duplicate token error missing');
   assert(['invalid_token', 'already_in_use'].includes(duplicateError.code), 'duplicate token error mismatch');
   send(duplicatePair.kiosk, { type: 'session_event', event: 'animation_done' });

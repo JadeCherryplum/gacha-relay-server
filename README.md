@@ -77,12 +77,18 @@ TEST_GOLD_P=1
 - `GET /healthz`
 - `GET /play?token=...`
 - `GET /play?result=...`
+- `GET /p/:playToken`
+- `GET /r/:resultToken`
 - `GET /admin`
+- `GET /a/:adminAuthToken`
 - `GET /admin/slots`
 - `POST /admin/slots/seed`
 - `GET /admin/log?date=YYYY-MM-DD`
 - `POST /admin/silver/reset?date=YYYY-MM-DD`
 - `GET /admin/claims?status=pending|claimed`
 - `GET /claim/:claimToken`
+- `GET /c/:claimToken`
+
+새로 생성되는 QR은 짧은 경로(`/p`, `/a`, `/c`)를 사용합니다. 기존 긴 경로(`/play?token=...`, `/admin/auth/...`, `/claim/...`)도 호환됩니다.
 
 관리자 페이지는 `ADMIN_PASSWORD`로 로그인합니다. 일일 운영자 인증 QR은 운영 시작 1시간 전에 자동 생성되고 운영 종료 시 만료됩니다.

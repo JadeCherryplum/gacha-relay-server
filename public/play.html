@@ -130,8 +130,21 @@
   (()=>{
     const HOLD_MS=100;
     const params=new URLSearchParams(location.search);
-    const playToken=params.get('token');
-    const resultToken=params.get('result');
+    const pathToken=prefix=>{
+      const match=location.pathname.match(new RegExp(`^/${prefix}/([^/]+)$`));
+      return match?decodeURIComponent(match[1]):null;
+    };
+    const tokenFromResultUrl=url=>{
+      try{
+        const parsed=new URL(url,location.href);
+        const queryToken=parsed.searchParams.get('result');
+        if(queryToken)return queryToken;
+        const match=parsed.pathname.match(/^\/r\/([^/]+)$/);
+        return match?decodeURIComponent(match[1]):null;
+      }catch{return null}
+    };
+    const playToken=params.get('token')||pathToken('p');
+    const resultToken=params.get('result')||pathToken('r');
     const preview=params.get('preview');
     const previewArtifactIndex=Number(params.get('artifactIndex')??0);
     const screens=['start','playing','resolving','finished','notice'];
@@ -405,7 +418,7 @@
     }
     function connect(){
       const scheme=location.protocol==='https:'?'wss:':'ws:';
-      ws=new WebSocket(`${scheme}//${location.host}/play?token=${encodeURIComponent(playToken)}`);
+      ws=new WebSocket(`${scheme}//${location.host}/p/${encodeURIComponent(playToken)}`);
       ws.onmessage=e=>{
         let m;
         try{m=JSON.parse(e.data)}catch{return}
@@ -438,7 +451,7 @@
       ws.onclose=()=>{
         clearStartDeadline();
         if(finished)return;
-        const token=resultUrl?new URL(resultUrl).searchParams.get('result'):null;
+        const token=resultUrl?tokenFromResultUrl(resultUrl):null;
         if(token)recover(token);
         else notice('연결이 종료되었습니다','키오스크에서 새 QR 코드를 다시 스캔해 주세요.');
       };

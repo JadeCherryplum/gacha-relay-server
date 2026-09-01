@@ -4,6 +4,7 @@ import { config } from './config.js';
 import { db, isoNow, localDate, localNow, timeOnLocalDate } from './db.js';
 
 export const ADMIN_COOKIE = 'claw_admin';
+const ADMIN_AUTH_TOKEN_BYTES = 12;
 
 export function randomToken(bytes = 24) {
   return randomBytes(bytes).toString('base64url');
@@ -52,7 +53,7 @@ export function getOrCreateDailyAuthToken(now = localNow()) {
   const existing = db.prepare('SELECT * FROM admin_auth_tokens WHERE local_date = ?').get(date);
   if (existing) return existing;
 
-  const token = randomToken();
+  const token = randomToken(ADMIN_AUTH_TOKEN_BYTES);
   db.prepare(`
     INSERT INTO admin_auth_tokens(local_date, token, available_at, expires_at)
     VALUES (?, ?, ?, ?)

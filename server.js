@@ -34,6 +34,8 @@ const tokenIndex = new Map();
 const VALID_ACTIONS = new Set(['left', 'right', 'up', 'down', 'grab']);
 const VALID_PHASES = new Set(['start', 'hold', 'stop']);
 const GUI_ROOT = join(__dirname, 'public', 'gui');
+const PLAY_QR_TOKEN_BYTES = 10;
+const SHORT_QR_TOKEN_BYTES = 12;
 const STATIC_TYPES = new Map([
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
@@ -66,6 +68,10 @@ function json(res, status, payload) {
 function html(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
   res.end(body);
+}
+
+function publicUrl(path, token) {
+  return `${config.publicBaseUrl}${path}/${encodeURIComponent(token)}`;
 }
 
 function serveGuiAsset(res, pathname) {
@@ -115,7 +121,7 @@ function issuePlayToken(kioskId) {
   const kiosk = kiosks.get(kioskId);
   if (!kiosk) return null;
   if (kiosk.pendingToken) tokenIndex.delete(kiosk.pendingToken.token);
-  const token = randomToken(16);
+  const token = randomToken(PLAY_QR_TOKEN_BYTES);
   kiosk.pendingToken = { token, expiresAt: Date.now() + config.tokenTtlSeconds * 1000 };
   tokenIndex.set(token, kioskId);
   return { token, expiresIn: config.tokenTtlSeconds };
@@ -151,7 +157,7 @@ function isKioskOnline(kioskId) {
 }
 
 function createResultRecord(sessionId, kioskId) {
-  const token = randomToken();
+  const token = randomToken(SHORT_QR_TOKEN_BYTES);
   const now = DateTime.utc();
   const expiresAt = closeAt(localNow()).toUTC();
   db.prepare(`
@@ -160,7 +166,7 @@ function createResultRecord(sessionId, kioskId) {
   `).run(token, sessionId, kioskId, now.toISO(), expiresAt.toISO());
   return {
     token,
-    resultUrl: `${config.publicBaseUrl}/play?result=${token}`,
+    resultUrl: publicUrl('/r', token),
     expiresAt: expiresAt.toISO(),
   };
 }
@@ -265,7 +271,7 @@ function revealResult(kioskId) {
     artifactIndex: row?.artifact_index ?? session.artifactIndex ?? null,
     prizeId: row?.prize_id ?? session.prizeId ?? null,
     prizeName: row?.prize_name ?? session.prizeName ?? null,
-    claimUrl: row?.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
+    claimUrl: row?.claim_token ? publicUrl('/c', row.claim_token) : null,
   });
 }
 
@@ -334,7 +340,7 @@ function handleGrabResolved(kioskId, msg = {}) {
   session.prizeName = resolved.prizeName ?? null;
   session.artifactIndex = physicallyGrabbed ? randomArtifactIndex() : null;
   session.state = 'waiting_animation_done';
-  const claimToken = session.result === 'gold' || session.result === 'silver' ? randomToken() : null;
+  const claimToken = session.result === 'gold' || session.result === 'silver' ? randomToken(SHORT_QR_TOKEN_BYTES) : null;
   db.prepare(`
     UPDATE play_log SET resolved_at = ?, result = ? WHERE session_id = ?
   `).run(isoNow(), session.result, session.sessionId);
@@ -427,7 +433,7 @@ function handleKioskMessage(kioskId, msg) {
     send(kiosk.socket, {
       type: 'token_issued',
       ...issued,
-      playUrl: `${config.publicBaseUrl}/play?token=${issued.token}`,
+      playUrl: publicUrl('/p', issued.token),
     });
     return;
   }
@@ -504,14 +510,14 @@ function resultPayload(row) {
     artifactIndex: row.artifact_index ?? null,
     prizeId: row.prize_id ?? null,
     prizeName: row.prize_name ?? null,
-    claimUrl: row.claim_token ? `${config.publicBaseUrl}/claim/${row.claim_token}` : null,
+    claimUrl: row.claim_token ? publicUrl('/c', row.claim_token) : null,
     expiresAt: row.expires_at,
   };
 }
 
 function adminPageData() {
   const auth = getOrCreateDailyAuthToken();
-  const authUrl = auth ? `${config.publicBaseUrl}/admin/auth/${auth.token}` : null;
+  const authUrl = auth ? publicUrl('/a', auth.token) : null;
   const now = isoNow();
   const slots = db.prepare('SELECT * FROM gold_slots ORDER BY start_at DESC LIMIT 20').all();
   const claims = db.prepare(`
@@ -545,10 +551,10 @@ function loginForm(action, title = 'Admin Login') {
   <h1>${title}</h1><form method="post" action="${action}"><input type="password" name="password" placeholder="Admin password" required><button>Login</button></form></html>`;
 }
 
-function claimPage(row) {
+function claimPage(row, basePath = `/claim/${row.claim_token}`) {
   const expired = row.expires_at <= isoNow();
   const status = row.claimed_at ? `이미 수령 완료 (${row.claimed_at})` : expired ? '수령 기한 만료' : '미수령';
-  const button = row.claimed_at || expired ? '' : `<form method="post" action="/claim/${row.claim_token}/complete"><button>수령 완료 처리</button></form>`;
+  const button = row.claimed_at || expired ? '' : `<form method="post" action="${basePath}/complete"><button>수령 완료 처리</button></form>`;
   return `<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>상품 수령 확인</title><style>body{font-family:sans-serif;max-width:520px;margin:40px auto;padding:20px}dt{color:#666;margin-top:18px}dd{font-size:22px;margin:4px 0}button{font-size:20px;padding:16px;width:100%;margin-top:28px}</style>
   <h1>상품 수령 확인</h1><dl><dt>상품 종류</dt><dd>${row.result.toUpperCase()}</dd><dt>상품명</dt><dd>${row.prize_name ?? row.result.toUpperCase()}</dd><dt>당첨 시각</dt><dd>${row.resolved_at}</dd><dt>키오스크 ID</dt><dd>${row.kiosk_id}</dd><dt>수령 상태</dt><dd>${status}</dd></dl>${button}</html>`;
@@ -564,6 +570,7 @@ async function handleHttp(req, res) {
   }
   if (url.pathname.startsWith('/gui/')) return serveGuiAsset(res, url.pathname);
   if (url.pathname === '/play') return html(res, 200, PLAY_HTML);
+  if (url.pathname.match(/^\/[pr]\/[^/]+$/)) return html(res, 200, PLAY_HTML);
   if (url.pathname === '/play-test' || url.pathname === '/play-test.html') return html(res, 200, PLAY_TEST_HTML);
 
   if (url.pathname.startsWith('/api/results/') && req.method === 'GET') {
@@ -594,8 +601,9 @@ async function handleHttp(req, res) {
     const session = createAdminSession();
     return redirect(res, '/admin', { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
   }
-  if (url.pathname.startsWith('/admin/auth/') && req.method === 'GET') {
-    if (!consumeAdminAuthToken(url.pathname.split('/').pop())) return html(res, 410, '<h1>Expired admin auth QR.</h1>');
+  const adminAuthMatch = url.pathname.match(/^\/(?:admin\/auth|a)\/([^/]+)$/);
+  if (adminAuthMatch && req.method === 'GET') {
+    if (!consumeAdminAuthToken(adminAuthMatch[1])) return html(res, 410, '<h1>Expired admin auth QR.</h1>');
     const session = createAdminSession();
     return redirect(res, '/admin', { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
   }
@@ -666,28 +674,29 @@ async function handleHttp(req, res) {
     });
   }
 
-  const claimMatch = url.pathname.match(/^\/claim\/([^/]+)(?:\/(login|complete))?$/);
+  const claimMatch = url.pathname.match(/^\/(claim|c)\/([^/]+)(?:\/(login|complete))?$/);
   if (claimMatch) {
-    const [, token, action] = claimMatch;
+    const [, prefix, token, action] = claimMatch;
+    const basePath = `/${prefix}/${token}`;
     const row = claimRow(token);
     if (!row) return html(res, 404, '<h1>Invalid claim QR.</h1>');
     if (action === 'login' && req.method === 'POST') {
       if (!config.adminPassword) return html(res, 503, '<h1>Admin password is not configured.</h1>');
       const body = await readBody(req);
-      if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm(`/claim/${token}/login`, 'Invalid password'));
+      if (!secureEqual(body.password ?? '', config.adminPassword)) return html(res, 401, loginForm(`${basePath}/login`, 'Invalid password'));
       const session = createAdminSession();
-      return redirect(res, `/claim/${token}`, { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
+      return redirect(res, basePath, { 'Set-Cookie': adminCookie(session.token, session.expiresAt) });
     }
-    if (!getAdminSession(req)) return html(res, 401, loginForm(`/claim/${token}/login`));
+    if (!getAdminSession(req)) return html(res, 401, loginForm(`${basePath}/login`));
     if (action === 'complete' && req.method === 'POST') {
       if (!row.claimed_at && row.expires_at > isoNow()) {
         const now = isoNow();
         db.prepare('UPDATE result_tokens SET claimed_at = ?, invalidated_at = ? WHERE claim_token = ? AND claimed_at IS NULL')
           .run(now, now, token);
       }
-      return redirect(res, `/claim/${token}`);
+      return redirect(res, basePath);
     }
-    if (!action && req.method === 'GET') return html(res, 200, claimPage(claimRow(token)));
+    if (!action && req.method === 'GET') return html(res, 200, claimPage(claimRow(token), basePath));
   }
 
   return json(res, 404, { error: 'not_found' });
@@ -705,6 +714,7 @@ const wssKiosk = new WebSocketServer({ noServer: true });
 const wssPlayer = new WebSocketServer({ noServer: true });
 httpServer.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  const shortPlayMatch = url.pathname.match(/^\/p\/([^/]+)$/);
   if (url.pathname === '/kiosk') {
     wssKiosk.handleUpgrade(req, socket, head, (ws) => {
       wssKiosk.emit('connection', ws, req);
@@ -716,6 +726,13 @@ httpServer.on('upgrade', (req, socket, head) => {
     wssPlayer.handleUpgrade(req, socket, head, (ws) => {
       wssPlayer.emit('connection', ws, req);
       handlePlayerConnection(ws, url.searchParams.get('token'));
+    });
+    return;
+  }
+  if (shortPlayMatch) {
+    wssPlayer.handleUpgrade(req, socket, head, (ws) => {
+      wssPlayer.emit('connection', ws, req);
+      handlePlayerConnection(ws, decodeURIComponent(shortPlayMatch[1]));
     });
     return;
   }
