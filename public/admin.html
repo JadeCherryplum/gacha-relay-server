@@ -26,7 +26,7 @@ const dt=(v)=>{
   if(!v)return '';
   const d=new Date(v);
   if(Number.isNaN(d.getTime()))return esc(v);
-  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:data.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(d).map(p=>[p.type,p.value]));
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:data.timezone||'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d).map(p=>[p.type,p.value]));
   return `${parts.year}/${parts.month}/${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
 };
 const scopeLabel=(scope)=>scope==='daily'?'매일':'전시 기간';
