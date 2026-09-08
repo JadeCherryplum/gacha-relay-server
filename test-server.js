@@ -118,8 +118,13 @@ async function createPlayable(kioskId) {
   await wait(30);
   send(kiosk, { type: 'request_token' });
   const issued = await waitFor(() => kiosk.messages.find((m) => m.type === 'token_issued'), `${kioskId} token missing`);
-  assert(new URL(issued.playUrl).pathname === `/p/${issued.token}`, 'play QR URL should use short path');
-  const player = await connect(`${WS}/p/${issued.token}`);
+  assert(/^[A-Z2-7]{16}$/.test(issued.token), 'play QR token should be 80-bit Base32');
+  assert(new URL(issued.playUrl).pathname === `/P/${issued.token}`, 'play QR URL should use uppercase short path');
+  assert(/^[0-9A-Z $%*+\-./:]+$/.test(issued.playUrl) && issued.playUrl.length <= 47,
+    'play QR URL should fit QR Version 2-L alphanumeric capacity');
+  const playPage = await fetch(issued.playUrl);
+  assert(playPage.status === 200, `uppercase play QR page failed ${playPage.status}`);
+  const player = await connect(`${WS}/P/${issued.token}`);
   await waitFor(() => player.messages.find((m) => m.type === 'claimed'), `${kioskId} claimed missing`);
   await waitFor(() => kiosk.messages.find((m) => m.type === 'player_claimed'), `${kioskId} player_claimed missing`);
   send(player, { type: 'start' });

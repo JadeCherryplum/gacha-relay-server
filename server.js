@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { dirname, extname, isAbsolute, join, normalize, sep } from 'node:path';
@@ -36,6 +37,7 @@ const VALID_PHASES = new Set(['start', 'hold', 'stop']);
 const GUI_ROOT = join(__dirname, 'public', 'gui');
 const PLAY_QR_TOKEN_BYTES = 10;
 const SHORT_QR_TOKEN_BYTES = 12;
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const STATIC_TYPES = new Map([
   ['.png', 'image/png'],
   ['.jpg', 'image/jpeg'],
@@ -72,6 +74,29 @@ function html(res, status, body, headers = {}) {
 
 function publicUrl(path, token) {
   return `${config.publicBaseUrl}${path}/${encodeURIComponent(token)}`;
+}
+
+function randomBase32Token(bytes = PLAY_QR_TOKEN_BYTES) {
+  const data = randomBytes(bytes);
+  let output = '';
+  let buffer = 0;
+  let bits = 0;
+
+  for (const byte of data) {
+    buffer = (buffer << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      output += BASE32_ALPHABET[(buffer >>> bits) & 31];
+      buffer &= (1 << bits) - 1;
+    }
+  }
+  if (bits > 0) output += BASE32_ALPHABET[(buffer << (5 - bits)) & 31];
+  return output;
+}
+
+function playQrUrl(token) {
+  return `${config.publicBaseUrl.replace(/\/+$/, '').toUpperCase()}/P/${token}`;
 }
 
 function serveGuiAsset(res, pathname) {
@@ -121,7 +146,7 @@ function issuePlayToken(kioskId) {
   const kiosk = kiosks.get(kioskId);
   if (!kiosk) return null;
   if (kiosk.pendingToken) tokenIndex.delete(kiosk.pendingToken.token);
-  const token = randomToken(PLAY_QR_TOKEN_BYTES);
+  const token = randomBase32Token();
   kiosk.pendingToken = { token, expiresAt: Date.now() + config.tokenTtlSeconds * 1000 };
   tokenIndex.set(token, kioskId);
   return { token, expiresIn: config.tokenTtlSeconds };
@@ -433,7 +458,7 @@ function handleKioskMessage(kioskId, msg) {
     send(kiosk.socket, {
       type: 'token_issued',
       ...issued,
-      playUrl: publicUrl('/p', issued.token),
+      playUrl: playQrUrl(issued.token),
     });
     return;
   }
@@ -570,7 +595,7 @@ async function handleHttp(req, res) {
   }
   if (url.pathname.startsWith('/gui/')) return serveGuiAsset(res, url.pathname);
   if (url.pathname === '/play') return html(res, 200, PLAY_HTML);
-  if (url.pathname.match(/^\/[pr]\/[^/]+$/)) return html(res, 200, PLAY_HTML);
+  if (url.pathname.match(/^\/[pP]\/[^/]+$/) || url.pathname.match(/^\/r\/[^/]+$/)) return html(res, 200, PLAY_HTML);
   if (url.pathname === '/play-test' || url.pathname === '/play-test.html') return html(res, 200, PLAY_TEST_HTML);
 
   if (url.pathname.startsWith('/api/results/') && req.method === 'GET') {
@@ -714,7 +739,7 @@ const wssKiosk = new WebSocketServer({ noServer: true });
 const wssPlayer = new WebSocketServer({ noServer: true });
 httpServer.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const shortPlayMatch = url.pathname.match(/^\/p\/([^/]+)$/);
+  const shortPlayMatch = url.pathname.match(/^\/[pP]\/([^/]+)$/);
   if (url.pathname === '/kiosk') {
     wssKiosk.handleUpgrade(req, socket, head, (ws) => {
       wssKiosk.emit('connection', ws, req);

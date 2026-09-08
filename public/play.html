@@ -131,7 +131,7 @@
     const HOLD_MS=100;
     const params=new URLSearchParams(location.search);
     const pathToken=prefix=>{
-      const match=location.pathname.match(new RegExp(`^/${prefix}/([^/]+)$`));
+      const match=location.pathname.match(new RegExp(`^/${prefix}/([^/]+)$`,'i'));
       return match?decodeURIComponent(match[1]):null;
     };
     const tokenFromResultUrl=url=>{
