@@ -3,9 +3,9 @@ import { DateTime } from 'luxon';
 import { db } from '../db.js';
 import { config } from '../config.js';
 
-const [start, end, pStart = '0.05', pEnd = '0.80'] = process.argv.slice(2);
+const [start, end, pStart = '0.01', pEnd = '0.03'] = process.argv.slice(2);
 if (!start || !end) {
-  console.error('사용법: npm run seed:gold -- "2026-07-04 20:00" "2026-07-04 21:00" [0.05] [0.80]');
+  console.error('사용법: npm run seed:gold -- "2026-09-19 18:00" "2026-09-19 23:00" [0.01] [0.03]');
   process.exit(1);
 }
 

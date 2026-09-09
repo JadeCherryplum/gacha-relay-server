@@ -62,6 +62,10 @@ npm run set:gold-dates -- 2026-09-19 2026-09-24 2026-09-25
 TEST_OPERATION_START_DATE=2026-08-26
 NORMAL_OPERATION_START_DATE=2026-09-07
 NORMAL_OPERATION_END_DATE=2026-09-27
+SILVER_P_START=0.01
+SILVER_P_END=0.05
+GOLD_P_START=0.01
+GOLD_P_END=0.03
 TEST_DAILY_GOLD_COUNT=1
 TEST_GOLD_P=1
 ```
@@ -70,7 +74,7 @@ TEST_GOLD_P=1
 - 정상 운영 기간에는 금 슬롯을 등록한 당일 특정 시간에만 금 당첨이 가능합니다.
 - 은 일일 보상은 운영 기간 시작일부터 현재일까지의 누적 수량으로 계산됩니다.
 - 당일 미당첨 또는 만료된 미수령 보상은 다음날 재고에 다시 포함됩니다.
-- 만료된 미수령 보상은 기록은 남지만 기본 운영툴 목록에서는 숨겨집니다.
+- 만료된 미수령 보상은 기록을 남기고 운영툴에서 `미수령 만료`로 표시합니다.
 
 ## HTTP
 

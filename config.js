@@ -29,7 +29,7 @@ export const config = {
   normalOperationStartDate: process.env.NORMAL_OPERATION_START_DATE ?? '2026-09-07',
   normalOperationEndDate: process.env.NORMAL_OPERATION_END_DATE ?? '2026-09-27',
   silverPStart: floatEnv('SILVER_P_START', 0.01),
-  silverPEnd: floatEnv('SILVER_P_END', 0.10),
+  silverPEnd: floatEnv('SILVER_P_END', 0.05),
   testDailyGoldCount: intEnv('TEST_DAILY_GOLD_COUNT', 1),
   testGoldP: floatEnv('TEST_GOLD_P', 1),
   adminPassword: process.env.ADMIN_PASSWORD ?? '',
