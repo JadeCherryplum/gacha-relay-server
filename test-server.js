@@ -172,6 +172,7 @@ async function run() {
   const adminHtml = await admin.text();
   assert(admin.ok && adminHtml.includes('상품별 재고 현황') && adminHtml.includes('운영 상태') && adminHtml.includes('/a/'), 'admin inventory failed');
   assert(adminHtml.includes('미수령 만료') && adminHtml.includes('결과 미표시'), 'admin claim history statuses missing');
+  assert(adminHtml.includes('"slots":[]'), 'pre-operation gold slots should be hidden from admin page');
   console.log('  ✓ admin and artifact data');
 
   console.log('\n=== test daily gold and claim ===');

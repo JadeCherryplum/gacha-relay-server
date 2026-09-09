@@ -544,12 +544,19 @@ function adminPageData() {
   const auth = getOrCreateDailyAuthToken();
   const authUrl = auth ? publicUrl('/a', auth.token) : null;
   const now = isoNow();
-  const slots = db.prepare('SELECT * FROM gold_slots ORDER BY start_at DESC LIMIT 20').all();
+  const operationStart = DateTime.fromISO(config.normalOperationStartDate, { zone: config.timezone }).startOf('day');
+  const historyStart = operationStart.isValid ? operationStart.toUTC().toISO() : '';
+  const slots = db.prepare(`
+    SELECT * FROM gold_slots
+    WHERE start_at >= ?
+    ORDER BY start_at DESC LIMIT 20
+  `).all(historyStart);
   const claims = db.prepare(`
     SELECT result, prize_id, prize_name, kiosk_id, visible_at, expires_at, claimed_at
-    FROM result_tokens WHERE result IN ('gold', 'silver')
+    FROM result_tokens
+    WHERE result IN ('gold', 'silver') AND created_at >= ?
     ORDER BY created_at DESC LIMIT 300
-  `).all();
+  `).all(historyStart);
   const summary = {
     onlineKiosks: [...kiosks.values()].filter((kiosk) => kiosk.socket?.readyState === 1).length,
     activeSessions: [...kiosks.values()].filter((kiosk) => kiosk.activeSession).length,
