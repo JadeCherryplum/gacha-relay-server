@@ -546,11 +546,10 @@ function adminPageData() {
   const now = isoNow();
   const slots = db.prepare('SELECT * FROM gold_slots ORDER BY start_at DESC LIMIT 20').all();
   const claims = db.prepare(`
-    SELECT result, prize_id, prize_name, kiosk_id, visible_at, claimed_at
+    SELECT result, prize_id, prize_name, kiosk_id, visible_at, expires_at, claimed_at
     FROM result_tokens WHERE result IN ('gold', 'silver')
-      AND (claimed_at IS NOT NULL OR expires_at > ?)
-    ORDER BY created_at DESC LIMIT 30
-  `).all(now);
+    ORDER BY created_at DESC LIMIT 300
+  `).all();
   const summary = {
     onlineKiosks: [...kiosks.values()].filter((kiosk) => kiosk.socket?.readyState === 1).length,
     activeSessions: [...kiosks.values()].filter((kiosk) => kiosk.activeSession).length,
@@ -687,8 +686,10 @@ async function handleHttp(req, res) {
       ? 'AND claimed_at IS NOT NULL'
       : status === 'pending'
         ? 'AND claimed_at IS NULL AND expires_at > ?'
-        : 'AND (claimed_at IS NOT NULL OR expires_at > ?)';
-    const params = status === 'claimed' ? [] : [now];
+        : status === 'expired'
+          ? 'AND claimed_at IS NULL AND expires_at <= ?'
+          : '';
+    const params = status === 'pending' || status === 'expired' ? [now] : [];
     return json(res, 200, {
       claims: db.prepare(`
         SELECT result, prize_id, prize_name, kiosk_id, resolved_at, expires_at, claimed_at

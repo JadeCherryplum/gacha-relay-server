@@ -49,7 +49,7 @@ npm test
 ## 금 슬롯 등록
 
 ```bash
-npm run seed:gold -- "2026-09-07 18:00" "2026-09-07 23:00" 0.01 0.15
+npm run set:gold-dates -- 2026-09-19 2026-09-24 2026-09-25
 ```
 
 입력 시간은 `TIMEZONE` 기준이며 DB에는 UTC로 저장됩니다.
