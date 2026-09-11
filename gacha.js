@@ -11,6 +11,7 @@ const GOLD_PRIZE = {
 };
 
 export const SILVER_PRIZES = [
+  { id: 'lucy_doll', name: '사비박사 뱃지', grade: 'silver', scope: 'daily', count: 10, availableFrom: config.lucyAvailableFrom },
   { id: 'usb', name: 'USB', grade: 'silver', scope: 'daily', count: 3 },
   { id: 'gyeyangbae', name: '계양배', grade: 'silver', scope: 'daily', count: 1 },
   { id: 'wooden_pillow', name: '목침', grade: 'silver', scope: 'daily', count: 1 },
@@ -51,10 +52,13 @@ function operationPhase(nowLocal = localNow()) {
   return null;
 }
 
-function elapsedPhaseDays(phase, nowLocal) {
+function elapsedPrizeDays(prize, phase, nowLocal) {
   if (!phase) return 0;
+  const availableFrom = parseLocalDate(prize.availableFrom);
+  const start = availableFrom.isValid ? DateTime.max(phase.start, availableFrom) : phase.start;
   const cappedDate = DateTime.min(nowLocal.startOf('day'), phase.end);
-  return Math.max(0, Math.floor(cappedDate.diff(phase.start, 'days').days) + 1);
+  if (cappedDate < start) return 0;
+  return Math.floor(cappedDate.diff(start, 'days').days) + 1;
 }
 
 function periodKey(prize, nowLocal) {
@@ -70,7 +74,7 @@ function periodKey(prize, nowLocal) {
 function totalUnits(prize, nowLocal) {
   const phase = operationPhase(nowLocal);
   if (prize.grade === 'gold' && phase?.name === TEST_PHASE) return config.testDailyGoldCount;
-  if (prize.scope === 'daily' && phase) return prize.count * elapsedPhaseDays(phase, nowLocal);
+  if (prize.scope === 'daily' && phase) return prize.count * elapsedPrizeDays(prize, phase, nowLocal);
   return prize.count;
 }
 

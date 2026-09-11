@@ -28,6 +28,7 @@ export const config = {
   testOperationStartDate: process.env.TEST_OPERATION_START_DATE ?? '2026-08-26',
   normalOperationStartDate: process.env.NORMAL_OPERATION_START_DATE ?? '2026-09-07',
   normalOperationEndDate: process.env.NORMAL_OPERATION_END_DATE ?? '2026-09-27',
+  lucyAvailableFrom: process.env.LUCY_AVAILABLE_FROM ?? '2026-09-11',
   silverPStart: floatEnv('SILVER_P_START', 0.005),
   silverPEnd: floatEnv('SILVER_P_END', 0.01),
   testDailyGoldCount: intEnv('TEST_DAILY_GOLD_COUNT', 1),
