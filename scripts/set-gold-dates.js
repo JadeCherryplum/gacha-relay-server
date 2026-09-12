@@ -46,7 +46,7 @@ const dates = dateInputs.map((input) => {
 });
 
 const pStart = parseProbability('GOLD_P_START', 0.002);
-const pEnd = parseProbability('GOLD_P_END', 0.005);
+const pEnd = parseProbability('GOLD_P_END', 0.01);
 
 const slots = dates.map((date) => {
   const startAt = timeOnDate(date, config.openTime);
