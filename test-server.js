@@ -34,9 +34,9 @@ const server = spawn(process.execPath, ['server.js'], {
     SILVER_P_END: '1',
     TEST_DAILY_GOLD_COUNT: '1',
     TEST_GOLD_P: '1',
-    GRAB_STARTED_TIMEOUT_MS: '500',
-    GRAB_RESOLVED_TIMEOUT_MS: '500',
-    ANIMATION_DONE_TIMEOUT_MS: '500',
+    GRAB_STARTED_TIMEOUT_MS: '2500',
+    GRAB_RESOLVED_TIMEOUT_MS: '2500',
+    ANIMATION_DONE_TIMEOUT_MS: '2500',
     START_TIMEOUT_MS: '150',
     HEARTBEAT_INTERVAL_MS: '60000',
   },
@@ -198,7 +198,7 @@ async function run() {
 
   console.log('\n=== silver weighted inventory ===');
   const silverPairs = [];
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < 64; i += 1) {
     const pair = await createPlayable(`claw-silver-${i}`);
     silverPairs.push(pair);
     await completeGrab(pair);
@@ -206,7 +206,7 @@ async function run() {
   const silverResults = silverPairs.map((pair) => pair.kiosk.messages.find((m) => m.type === 'grab_result'));
   assert(silverResults.every((m) => m.result === 'silver' && m.prizeId && m.prizeName), 'silver prize payload missing');
   const counts = silverResults.reduce((map, result) => map.set(result.prizeId, (map.get(result.prizeId) ?? 0) + 1), new Map());
-  assert(counts.get('lucy_doll') === 10, 'lucy availability date count mismatch');
+  assert(counts.get('lucy_doll') === 50, 'lucy availability date count mismatch');
   assert(counts.get('usb') === 6, 'usb rollover count mismatch');
   assert(['gyeyangbae', 'wooden_pillow', 'handkerchief', 'ceramic_lunchbox'].every((id) => counts.get(id) === 2), 'single silver rollover count mismatch');
   const noSilver = await createPlayable('claw-silver-empty');

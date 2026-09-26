@@ -11,7 +11,7 @@ const GOLD_PRIZE = {
 };
 
 export const SILVER_PRIZES = [
-  { id: 'lucy_doll', name: '사비박사 뱃지', grade: 'silver', scope: 'daily', count: 10, availableFrom: config.lucyAvailableFrom },
+  { id: 'lucy_doll', name: '사비박사 뱃지', grade: 'silver', scope: 'daily', count: 50, availableFrom: config.lucyAvailableFrom },
   { id: 'usb', name: 'USB', grade: 'silver', scope: 'daily', count: 3 },
   { id: 'gyeyangbae', name: '계양배', grade: 'silver', scope: 'daily', count: 1 },
   { id: 'wooden_pillow', name: '목침', grade: 'silver', scope: 'daily', count: 1 },
