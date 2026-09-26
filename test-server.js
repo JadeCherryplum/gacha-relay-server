@@ -30,6 +30,8 @@ const server = spawn(process.execPath, ['server.js'], {
     NORMAL_OPERATION_START_DATE: todayLocal.plus({ days: 1 }).toISODate(),
     NORMAL_OPERATION_END_DATE: todayLocal.plus({ days: 21 }).toISODate(),
     LUCY_AVAILABLE_FROM: todayLocal.toISODate(),
+    LUCY_DAILY_BOOST_DATES: [todayLocal.toISODate(), todayLocal.plus({ days: 1 }).toISODate()].join(','),
+    LUCY_DAILY_BOOST_COUNT: '50',
     SILVER_P_START: '1',
     SILVER_P_END: '1',
     TEST_DAILY_GOLD_COUNT: '1',

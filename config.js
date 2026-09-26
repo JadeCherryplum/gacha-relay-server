@@ -10,6 +10,13 @@ function floatEnv(name, fallback) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function listEnv(name, fallback) {
+  return (process.env[name] ?? fallback)
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 export const config = {
   port: intEnv('PORT', 8080),
   bindHost: process.env.BIND_HOST ?? '127.0.0.1',
@@ -29,6 +36,8 @@ export const config = {
   normalOperationStartDate: process.env.NORMAL_OPERATION_START_DATE ?? '2026-09-07',
   normalOperationEndDate: process.env.NORMAL_OPERATION_END_DATE ?? '2026-09-27',
   lucyAvailableFrom: process.env.LUCY_AVAILABLE_FROM ?? '2026-09-11',
+  lucyDailyBoostDates: listEnv('LUCY_DAILY_BOOST_DATES', '2026-09-26,2026-09-27'),
+  lucyDailyBoostCount: intEnv('LUCY_DAILY_BOOST_COUNT', 50),
   silverPStart: floatEnv('SILVER_P_START', 0.005),
   silverPEnd: floatEnv('SILVER_P_END', 0.02),
   testDailyGoldCount: intEnv('TEST_DAILY_GOLD_COUNT', 1),
